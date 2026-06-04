@@ -1,9 +1,63 @@
 <script lang="ts">
+  import { page } from '$app/state';
   import { KeyRound, Lock, Plus, Search, ShieldCheck } from '@lucide/svelte';
   import Badge from '$lib/components/ui/badge/Badge.svelte';
   import Button from '$lib/components/ui/button/Button.svelte';
   import Input from '$lib/components/ui/input/Input.svelte';
   import type { VaultItemSummary } from '$lib/features/vault/types';
+  import { cn } from '$lib/utils/cn';
+
+  type VaultSection = {
+    id: string;
+    label: string;
+    href: string;
+    description: string;
+  };
+
+  const sections: VaultSection[] = [
+    {
+      id: 'all',
+      label: 'All Items',
+      href: '/vault',
+      description: 'All unlocked item summaries'
+    },
+    {
+      id: 'favorites',
+      label: 'Favorites',
+      href: '/vault?section=favorites',
+      description: 'Pinned item summaries'
+    },
+    {
+      id: 'logins',
+      label: 'Logins',
+      href: '/vault?section=logins',
+      description: 'Password login items'
+    },
+    {
+      id: 'secure-notes',
+      label: 'Secure Notes',
+      href: '/vault?section=secure-notes',
+      description: 'Encrypted note items'
+    },
+    {
+      id: 'cards',
+      label: 'Cards',
+      href: '/vault?section=cards',
+      description: 'Payment card items'
+    },
+    {
+      id: 'identities',
+      label: 'Identities',
+      href: '/vault?section=identities',
+      description: 'Identity profile items'
+    },
+    {
+      id: '2fa',
+      label: '2FA',
+      href: '/vault?section=2fa',
+      description: 'Items with TOTP codes'
+    }
+  ];
 
   const items: VaultItemSummary[] = [
     {
@@ -21,8 +75,44 @@
       username: 'sync@example.com',
       favorite: false,
       updatedAt: 'Yesterday'
+    },
+    {
+      id: 'sample-3',
+      kind: 'secure_note',
+      title: 'Recovery codes',
+      favorite: false,
+      updatedAt: 'Last week'
+    },
+    {
+      id: 'sample-4',
+      kind: 'card',
+      title: 'Travel card',
+      favorite: false,
+      updatedAt: 'May 28'
+    },
+    {
+      id: 'sample-5',
+      kind: 'identity',
+      title: 'Personal identity',
+      favorite: false,
+      updatedAt: 'May 18'
     }
   ];
+
+  const sectionId = $derived(page.url.searchParams.get('section') ?? 'all');
+  const activeSection = $derived(sections.find((section) => section.id === sectionId) ?? sections[0]);
+  const filteredItems = $derived(
+    items.filter((item) => {
+      if (activeSection.id === 'all') return true;
+      if (activeSection.id === 'favorites') return item.favorite;
+      if (activeSection.id === 'logins') return item.kind === 'login';
+      if (activeSection.id === 'secure-notes') return item.kind === 'secure_note';
+      if (activeSection.id === 'cards') return item.kind === 'card';
+      if (activeSection.id === 'identities') return item.kind === 'identity';
+      if (activeSection.id === '2fa') return item.id === 'sample-1';
+      return false;
+    })
+  );
 </script>
 
 <section class="grid min-h-screen bg-[rgb(var(--background))] lg:grid-cols-[16rem_minmax(0,1fr)]">
@@ -41,12 +131,17 @@
     </div>
 
     <nav class="mt-6 flex flex-wrap gap-1 text-sm lg:mt-8 lg:grid" aria-label="Vault sections">
-      {#each ['All Items', 'Favorites', 'Logins', 'Secure Notes', 'Cards', 'Identities', '2FA'] as item (item)}
+      {#each sections as section (section.id)}
         <a
-          class="rounded-[var(--radius-md)] px-3 py-2 text-[rgb(var(--foreground))] transition-colors duration-200 hover:bg-[rgb(var(--surface-muted))]"
-          href="/vault"
+          aria-current={activeSection.id === section.id ? 'page' : undefined}
+          class={cn(
+            'rounded-[var(--radius-md)] px-3 py-2 text-[rgb(var(--foreground))] transition-colors duration-200 hover:bg-[rgb(var(--surface-muted))]',
+            activeSection.id === section.id &&
+              'bg-[rgb(var(--primary)/0.12)] font-medium text-[rgb(var(--accent-foreground))]'
+          )}
+          href={section.href}
         >
-          {item}
+          {section.label}
         </a>
       {/each}
     </nav>
@@ -76,12 +171,12 @@
     <div class="grid min-h-0 xl:grid-cols-[22rem_minmax(0,1fr)]">
       <section class="overflow-auto border-r border-[rgb(var(--border))] bg-[rgb(var(--surface)/0.62)]">
         <div class="border-b border-[rgb(var(--border))] px-5 py-4">
-          <h1 class="text-base font-semibold">All Items</h1>
-          <p class="mt-1 text-sm text-[rgb(var(--muted))]">Summaries only while unlocked</p>
+          <h1 class="text-base font-semibold">{activeSection.label}</h1>
+          <p class="mt-1 text-sm text-[rgb(var(--muted))]">{activeSection.description}</p>
         </div>
 
         <div class="grid gap-2 p-3">
-          {#each items as item (item.id)}
+          {#each filteredItems as item (item.id)}
             <button
               class="grid cursor-pointer gap-1 rounded-[var(--radius-md)] border border-transparent p-3 text-left transition-colors duration-200 hover:border-[rgb(var(--border))] hover:bg-[rgb(var(--surface))]"
               type="button"
@@ -95,6 +190,13 @@
               <span class="text-sm text-[rgb(var(--muted))]">{item.username}</span>
               <span class="text-xs text-[rgb(var(--muted))]">Updated {item.updatedAt}</span>
             </button>
+          {:else}
+            <div class="rounded-[var(--radius-md)] border border-dashed border-[rgb(var(--border))] p-4">
+              <p class="text-sm font-medium">No items in {activeSection.label.toLowerCase()}.</p>
+              <p class="mt-1 text-sm text-[rgb(var(--muted))]">
+                Add or import vault data after the Rust storage layer is connected.
+              </p>
+            </div>
           {/each}
         </div>
       </section>
