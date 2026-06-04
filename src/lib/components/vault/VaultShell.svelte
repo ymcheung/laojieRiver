@@ -192,7 +192,7 @@
   }
 </script>
 
-<section class="min-h-screen bg-[rgb(var(--background))] px-4 pb-0 pt-16 sm:px-8">
+<section class="relative min-h-screen bg-[rgb(var(--background))] px-4 pb-0 pt-16 sm:px-8">
   <a
     class="fixed right-6 top-5 z-10 rounded-[var(--radius-sm)] px-2 py-1 text-sm font-medium text-[rgb(var(--foreground))] transition-colors duration-200 hover:bg-[rgb(var(--surface-muted))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--ring))]"
     href="/settings"
@@ -200,11 +200,31 @@
     Settings
   </a>
 
+  <nav
+    class="mx-auto mb-4 flex max-w-[78rem] flex-wrap gap-1 text-sm lg:absolute lg:top-16 lg:mx-0 lg:mb-0 lg:grid lg:w-36"
+    style="left: max(2rem, calc(50% - 50rem));"
+    aria-label="Vault sections"
+  >
+    {#each sections as section (section.id)}
+      <a
+        aria-current={activeSection.id === section.id ? 'page' : undefined}
+        class={cn(
+          'rounded-[var(--radius-md)] px-3 py-2 text-[rgb(var(--foreground))] transition-colors duration-200 hover:bg-[rgb(var(--surface-muted))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--ring))]',
+          activeSection.id === section.id &&
+            'bg-[rgb(var(--primary)/0.12)] font-medium text-[rgb(var(--accent-foreground))]'
+        )}
+        href={section.href}
+      >
+        {section.label}
+      </a>
+    {/each}
+  </nav>
+
   <div
     class="mx-auto grid min-h-[calc(100vh-4rem)] max-w-[78rem] grid-cols-1 overflow-hidden rounded-tl-[2rem] lg:grid-cols-[minmax(20rem,35rem)_0.75rem_minmax(0,1fr)]"
   >
     <aside class="min-h-[28rem] overflow-auto bg-[rgb(var(--surface))]">
-      <header class="grid gap-4 border-b border-[rgb(var(--border))] px-5 py-5">
+      <header class="border-b border-[rgb(var(--border))] px-5 py-5">
         <div class="flex flex-wrap items-center gap-3">
           <div class="relative min-w-56 flex-1">
             <Search
@@ -222,22 +242,6 @@
             Lock
           </Button>
         </div>
-
-        <nav class="flex flex-wrap gap-1 text-sm" aria-label="Vault sections">
-          {#each sections as section (section.id)}
-            <a
-              aria-current={activeSection.id === section.id ? 'page' : undefined}
-              class={cn(
-                'rounded-[var(--radius-md)] px-3 py-2 text-[rgb(var(--foreground))] transition-colors duration-200 hover:bg-[rgb(var(--surface-muted))]',
-                activeSection.id === section.id &&
-                  'bg-[rgb(var(--primary)/0.12)] font-medium text-[rgb(var(--accent-foreground))]'
-              )}
-              href={section.href}
-            >
-              {section.label}
-            </a>
-          {/each}
-        </nav>
       </header>
 
       <section>
