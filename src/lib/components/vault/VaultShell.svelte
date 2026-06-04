@@ -1,6 +1,6 @@
 <script lang="ts">
   import { page } from '$app/state';
-  import { KeyRound, Lock, Plus, Search, ShieldCheck } from '@lucide/svelte';
+  import { KeyRound, Lock, Plus, Search } from '@lucide/svelte';
   import Badge from '$lib/components/ui/badge/Badge.svelte';
   import Button from '$lib/components/ui/button/Button.svelte';
   import Input from '$lib/components/ui/input/Input.svelte';
@@ -192,61 +192,55 @@
   }
 </script>
 
-<section class="grid min-h-screen bg-[rgb(var(--background))] lg:grid-cols-[16rem_minmax(0,1fr)]">
-  <aside class="border-b border-[rgb(var(--border))] bg-[rgb(var(--surface)/0.92)] px-4 py-5 lg:border-b-0 lg:border-r">
-    <div class="flex items-center gap-3">
-      <div
-        class="flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] bg-[rgb(var(--primary))] text-[rgb(var(--primary-foreground))]"
-        aria-hidden="true"
-      >
-        <ShieldCheck size={20} />
-      </div>
-      <div>
-        <p class="text-sm font-semibold leading-5">LaoJie River</p>
-        <p class="text-xs text-[rgb(var(--muted))]">老街溪</p>
-      </div>
-    </div>
+<section class="min-h-screen bg-[rgb(var(--background))] px-4 pb-0 pt-16 sm:px-8">
+  <a
+    class="fixed right-6 top-5 z-10 rounded-[var(--radius-sm)] px-2 py-1 text-sm font-medium text-[rgb(var(--foreground))] transition-colors duration-200 hover:bg-[rgb(var(--surface-muted))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--ring))]"
+    href="/settings"
+  >
+    Settings
+  </a>
 
-    <nav class="mt-6 flex flex-wrap gap-1 text-sm lg:mt-8 lg:grid" aria-label="Vault sections">
-      {#each sections as section (section.id)}
-        <a
-          aria-current={activeSection.id === section.id ? 'page' : undefined}
-          class={cn(
-            'rounded-[var(--radius-md)] px-3 py-2 text-[rgb(var(--foreground))] transition-colors duration-200 hover:bg-[rgb(var(--surface-muted))]',
-            activeSection.id === section.id &&
-              'bg-[rgb(var(--primary)/0.12)] font-medium text-[rgb(var(--accent-foreground))]'
-          )}
-          href={section.href}
-        >
-          {section.label}
-        </a>
-      {/each}
-    </nav>
-  </aside>
+  <div
+    class="mx-auto grid min-h-[calc(100vh-4rem)] max-w-[78rem] grid-cols-1 overflow-hidden rounded-tl-[2rem] lg:grid-cols-[minmax(20rem,35rem)_0.75rem_minmax(0,1fr)]"
+  >
+    <aside class="min-h-[28rem] overflow-auto bg-[rgb(var(--surface))]">
+      <header class="grid gap-4 border-b border-[rgb(var(--border))] px-5 py-5">
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="relative min-w-56 flex-1">
+            <Search
+              class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[rgb(var(--muted))]"
+              size={17}
+            />
+            <Input aria-label="Search vault items" class="pl-9" placeholder="Search items or actions" />
+          </div>
+          <Button variant="secondary">
+            <Plus size={16} />
+            New item
+          </Button>
+          <Button variant="ghost">
+            <Lock size={16} />
+            Lock
+          </Button>
+        </div>
 
-  <main class="grid min-w-0 grid-rows-[auto_minmax(0,1fr)]">
-    <header
-      class="flex flex-wrap items-center gap-3 border-b border-[rgb(var(--border))] bg-[rgb(var(--surface)/0.78)] px-5 py-4 backdrop-blur"
-    >
-      <div class="relative min-w-56 flex-1">
-        <Search
-          class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[rgb(var(--muted))]"
-          size={17}
-        />
-        <Input aria-label="Search vault items" class="pl-9" placeholder="Search items or actions" />
-      </div>
-      <Button variant="secondary">
-        <Plus size={16} />
-        New item
-      </Button>
-      <Button variant="ghost">
-        <Lock size={16} />
-        Lock
-      </Button>
-    </header>
+        <nav class="flex flex-wrap gap-1 text-sm" aria-label="Vault sections">
+          {#each sections as section (section.id)}
+            <a
+              aria-current={activeSection.id === section.id ? 'page' : undefined}
+              class={cn(
+                'rounded-[var(--radius-md)] px-3 py-2 text-[rgb(var(--foreground))] transition-colors duration-200 hover:bg-[rgb(var(--surface-muted))]',
+                activeSection.id === section.id &&
+                  'bg-[rgb(var(--primary)/0.12)] font-medium text-[rgb(var(--accent-foreground))]'
+              )}
+              href={section.href}
+            >
+              {section.label}
+            </a>
+          {/each}
+        </nav>
+      </header>
 
-    <div class="grid min-h-0 xl:grid-cols-[22rem_minmax(0,1fr)]">
-      <section class="overflow-auto border-r border-[rgb(var(--border))] bg-[rgb(var(--surface)/0.62)]">
+      <section>
         <div class="border-b border-[rgb(var(--border))] px-5 py-4">
           <h1 class="text-base font-semibold">{activeSection.label}</h1>
           <p class="mt-1 text-sm text-[rgb(var(--muted))]">{activeSection.description}</p>
@@ -255,7 +249,7 @@
         <div class="grid gap-2 p-3">
           {#each filteredItems as item (item.id)}
             <button
-              class="grid cursor-pointer gap-1 rounded-[var(--radius-md)] border border-transparent p-3 text-left transition-colors duration-200 hover:border-[rgb(var(--border))] hover:bg-[rgb(var(--surface))]"
+              class="grid cursor-pointer gap-1 rounded-[var(--radius-md)] border border-transparent p-3 text-left transition-colors duration-200 hover:border-[rgb(var(--border))] hover:bg-[rgb(var(--surface-muted))]"
               type="button"
             >
               <span class="flex items-center justify-between gap-3">
@@ -279,48 +273,50 @@
           {/each}
         </div>
       </section>
+    </aside>
 
-      <section class="min-w-0 overflow-auto border-t border-[rgb(var(--border))] p-5 md:p-8 xl:border-t-0">
-        <div class="mx-auto max-w-3xl">
-          {#if filteredItems.length === 0}
-            <VaultEmptyState
-              eyebrow="Nothing selected"
-              title="Choose or create an item"
-              description="The detail pane stays empty until an item summary is selected. Decrypted fields should be requested only for that selected item."
-              primaryAction={emptyState.primaryAction}
-              icon={emptyState.icon}
-            />
-          {:else}
-            <Badge tone="warning">Scaffold mode</Badge>
-            <div class="mt-4 flex items-start justify-between gap-6">
-              <div>
-                <h2 class="text-2xl font-semibold tracking-normal">Selected item detail</h2>
-                <p class="mt-2 max-w-xl text-sm leading-6 text-[rgb(var(--muted))]">
-                  The UI shell is ready for narrow Tauri commands. Real decrypted fields should
-                  only be requested for the selected item after the Rust vault is unlocked.
-                </p>
-              </div>
+    <div class="hidden bg-[rgb(var(--surface-strong))] lg:block" aria-hidden="true"></div>
+
+    <main class="min-h-[28rem] overflow-auto bg-[rgb(var(--surface))] p-5 md:p-8">
+      <div class="mx-auto max-w-3xl">
+        {#if filteredItems.length === 0}
+          <VaultEmptyState
+            eyebrow="Nothing selected"
+            title="Choose or create an item"
+            description="The detail pane stays empty until an item summary is selected. Decrypted fields should be requested only for that selected item."
+            primaryAction={emptyState.primaryAction}
+            icon={emptyState.icon}
+          />
+        {:else}
+          <Badge tone="warning">Scaffold mode</Badge>
+          <div class="mt-4 flex items-start justify-between gap-6">
+            <div>
+              <h2 class="text-2xl font-semibold tracking-normal">Selected item detail</h2>
+              <p class="mt-2 max-w-xl text-sm leading-6 text-[rgb(var(--muted))]">
+                The UI shell is ready for narrow Tauri commands. Real decrypted fields should
+                only be requested for the selected item after the Rust vault is unlocked.
+              </p>
+            </div>
+            <div
+              class="flex h-12 w-12 items-center justify-center rounded-[var(--radius-md)] border border-[rgb(var(--border))] bg-[rgb(var(--surface))]"
+              aria-hidden="true"
+            >
+              <KeyRound size={22} />
+            </div>
+          </div>
+
+          <div class="mt-8 grid gap-4">
+            {#each ['Username', 'Password', 'TOTP', 'Notes'] as label (label)}
               <div
-                class="flex h-12 w-12 items-center justify-center rounded-[var(--radius-md)] border border-[rgb(var(--border))] bg-[rgb(var(--surface))]"
-                aria-hidden="true"
+                class="rounded-[var(--radius-md)] border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
               >
-                <KeyRound size={22} />
+                <p class="text-xs font-medium uppercase text-[rgb(var(--muted))]">{label}</p>
+                <p class="mt-2 text-sm text-[rgb(var(--foreground))]">Connected to Rust command API later</p>
               </div>
-            </div>
-
-            <div class="mt-8 grid gap-4">
-              {#each ['Username', 'Password', 'TOTP', 'Notes'] as label (label)}
-                <div
-                  class="rounded-[var(--radius-md)] border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
-                >
-                  <p class="text-xs font-medium uppercase text-[rgb(var(--muted))]">{label}</p>
-                  <p class="mt-2 text-sm text-[rgb(var(--foreground))]">Connected to Rust command API later</p>
-                </div>
-              {/each}
-            </div>
-          {/if}
-        </div>
-      </section>
-    </div>
-  </main>
+            {/each}
+          </div>
+        {/if}
+      </div>
+    </main>
+  </div>
 </section>

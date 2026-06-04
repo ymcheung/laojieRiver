@@ -15,6 +15,7 @@
 
 - **Max Width:** No marketing max-width cap for the unlocked app shell. Use the full desktop window with comfortable internal constraints.
 - **Layout:** Desktop app layout: persistent left sidebar, top command/search area, vault item list, and detail pane. Collapse to list/detail navigation at narrow widths.
+- **Wireframe Frame:** Use a centered split-pane workspace for vault and settings screens: left pane, explicit Zinc divider, broad right pane, rounded top-left corner on the left pane, and flat Zinc page background.
 - **Sections:** Navigation groups, search/command bar, add/lock controls, filtered item list, selected item detail, and transient status/toast region.
 
 ### Spacing Overrides
@@ -63,3 +64,4 @@
 - Accessibility: Minimum 4.5:1 ratio for normal text, visible keyboard focus, Escape-friendly overlays, and screen-reader labels for icon buttons.
 - Command UX: Cmd/Ctrl+K should find items and actions such as add login, generate password, open settings, and lock vault.
 - Empty States: Use concise, task-specific states for empty filters, first-run vaults, and unselected detail panes. Keep actions visible, avoid blank panels, and use Sky only for the primary action/focus while the container, icon frame, borders, and text remain Zinc.
+- Settings Entry: Keep the top-right `Settings` text at the same size as the vault action buttons (`text-sm` / 14px). Do not promote it to a page title scale.
