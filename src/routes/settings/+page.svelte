@@ -61,6 +61,60 @@
 
   const activeId = $derived(page.url.searchParams.get('section') ?? 'security');
   const activeSection = $derived(sections.find((section) => section.id === activeId) ?? sections[0]);
+  let frameElement: HTMLElement | undefined = $state();
+  let leftPaneWidth = $state(440);
+
+  const dividerWidth = 12;
+  const minLeftPaneWidth = 320;
+  const minRightPaneWidth = 560;
+  const maxLeftPaneWidth = $derived.by(() => {
+    if (!frameElement) return 560;
+    return Math.max(minLeftPaneWidth, frameElement.clientWidth - dividerWidth - minRightPaneWidth);
+  });
+  const constrainedLeftPaneWidth = $derived(
+    Math.min(Math.max(leftPaneWidth, minLeftPaneWidth), maxLeftPaneWidth)
+  );
+  const splitPaneColumns = $derived(
+    `${constrainedLeftPaneWidth}px ${dividerWidth}px minmax(${minRightPaneWidth}px, 1fr)`
+  );
+
+  function resizeLeftPane(clientX: number) {
+    if (!frameElement) return;
+
+    const frameRect = frameElement.getBoundingClientRect();
+    leftPaneWidth = Math.min(
+      Math.max(clientX - frameRect.left, minLeftPaneWidth),
+      frameRect.width - dividerWidth - minRightPaneWidth
+    );
+  }
+
+  function startResize(event: PointerEvent) {
+    if (!frameElement) return;
+
+    event.preventDefault();
+    resizeLeftPane(event.clientX);
+
+    function handlePointerMove(moveEvent: PointerEvent) {
+      resizeLeftPane(moveEvent.clientX);
+    }
+
+    function stopResize() {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', stopResize);
+    }
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', stopResize, { once: true });
+  }
+
+  function resizeWithKeyboard(event: KeyboardEvent) {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+
+    event.preventDefault();
+    const direction = event.key === 'ArrowLeft' ? -1 : 1;
+    const step = event.shiftKey ? 48 : 24;
+    leftPaneWidth = Math.min(Math.max(leftPaneWidth + direction * step, minLeftPaneWidth), maxLeftPaneWidth);
+  }
 </script>
 
 {#snippet settingsIcon(icon: SettingsSection['icon'])}
@@ -87,8 +141,10 @@
   </span>
 
   <section
-    class="mx-auto grid min-h-[calc(100vh-4rem)] max-w-[78rem] grid-cols-1 overflow-hidden rounded-tl-[2rem] lg:ml-[var(--frame-left)] lg:mr-0 lg:max-w-none lg:grid-cols-[minmax(20rem,35rem)_0.75rem_minmax(0,1fr)]"
-    style="--frame-left: max(1rem, calc(50vw - 624px));"
+    bind:this={frameElement}
+    class="mx-auto grid min-h-[calc(100vh-4rem)] max-w-[78rem] grid-cols-1 overflow-hidden rounded-tl-[2rem] lg:ml-[var(--frame-left)] lg:mr-0 lg:max-w-none lg:grid-cols-[var(--split-pane-columns)]"
+    style:--frame-left="max(1rem, calc(50vw - 624px))"
+    style:--split-pane-columns={splitPaneColumns}
   >
     <aside class="min-h-[28rem] overflow-auto bg-[rgb(var(--surface))]">
       <div class="border-b border-[rgb(var(--border))] px-5 py-5">
@@ -132,7 +188,24 @@
       </nav>
     </aside>
 
-    <div class="hidden bg-[rgb(var(--surface-strong))] lg:block" aria-hidden="true"></div>
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions - focusable separators are the ARIA pattern for resizable split panes. -->
+    <div
+      class="group relative hidden cursor-col-resize touch-none bg-[rgb(var(--surface-strong))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[rgb(var(--ring))] lg:block"
+      role="separator"
+      tabindex="0"
+      aria-label="Resize settings columns"
+      aria-orientation="vertical"
+      aria-valuemin={minLeftPaneWidth}
+      aria-valuemax={maxLeftPaneWidth}
+      aria-valuenow={constrainedLeftPaneWidth}
+      onpointerdown={startResize}
+      onkeydown={resizeWithKeyboard}
+    >
+      <span
+        class="absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 bg-transparent transition-colors duration-200 group-hover:bg-[rgb(var(--muted))] group-focus-visible:bg-[rgb(var(--muted))]"
+        aria-hidden="true"
+      ></span>
+    </div>
 
     <section class="min-h-[28rem] overflow-auto bg-[rgb(var(--surface))] p-5 md:p-8">
       <div class="mx-auto max-w-3xl">
