@@ -4,6 +4,7 @@
   import Badge from '$lib/components/ui/badge/Badge.svelte';
   import Button from '$lib/components/ui/button/Button.svelte';
   import Input from '$lib/components/ui/input/Input.svelte';
+  import VaultEmptyState from '$lib/components/vault/VaultEmptyState.svelte';
   import type { VaultItemSummary } from '$lib/features/vault/types';
   import { cn } from '$lib/utils/cn';
 
@@ -12,6 +13,15 @@
     label: string;
     href: string;
     description: string;
+  };
+
+  type EmptyStateContent = {
+    eyebrow: string;
+    title: string;
+    description: string;
+    primaryAction: string;
+    secondaryAction?: string;
+    icon: 'key' | 'star' | 'note' | 'card' | 'identity' | 'totp';
   };
 
   const sections: VaultSection[] = [
@@ -109,10 +119,77 @@
       if (activeSection.id === 'secure-notes') return item.kind === 'secure_note';
       if (activeSection.id === 'cards') return item.kind === 'card';
       if (activeSection.id === 'identities') return item.kind === 'identity';
-      if (activeSection.id === '2fa') return item.id === 'sample-1';
+      if (activeSection.id === '2fa') return false;
       return false;
     })
   );
+
+  const emptyState = $derived(getEmptyState(activeSection.id));
+
+  function getEmptyState(section: string): EmptyStateContent {
+    const copy: Record<string, EmptyStateContent> = {
+      all: {
+        eyebrow: 'Vault is ready',
+        title: 'No items in this vault yet',
+        description:
+          'Create a login, secure note, card, identity, or 2FA entry after the Rust vault storage layer is connected.',
+        primaryAction: 'New item',
+        secondaryAction: 'Import backup',
+        icon: 'key'
+      },
+      favorites: {
+        eyebrow: 'Pinned items',
+        title: 'No favorites yet',
+        description:
+          'Mark high-priority items as favorites so they stay easy to reach without exposing secret details in the list.',
+        primaryAction: 'Browse all items',
+        icon: 'star'
+      },
+      logins: {
+        eyebrow: 'Passwords',
+        title: 'No login items yet',
+        description:
+          'Add your first login once encrypted item creation is available. Password generation should stay on the Rust side.',
+        primaryAction: 'Add login',
+        icon: 'key'
+      },
+      'secure-notes': {
+        eyebrow: 'Encrypted notes',
+        title: 'No secure notes yet',
+        description:
+          'Use secure notes for recovery codes or private text that should be encrypted with the vault key.',
+        primaryAction: 'Add secure note',
+        icon: 'note'
+      },
+      cards: {
+        eyebrow: 'Payment cards',
+        title: 'No cards saved yet',
+        description:
+          'Store card details only after encrypted storage, field masking, and explicit reveal controls are implemented.',
+        primaryAction: 'Add card',
+        icon: 'card'
+      },
+      identities: {
+        eyebrow: 'Profiles',
+        title: 'No identities yet',
+        description:
+          'Identity items can hold profile details for form filling later. Keep summaries minimal while the vault is locked.',
+        primaryAction: 'Add identity',
+        icon: 'identity'
+      },
+      '2fa': {
+        eyebrow: 'TOTP',
+        title: 'No 2FA codes yet',
+        description:
+          'Paste an otpauth URL or add a secret manually once TOTP parsing is implemented in Rust.',
+        primaryAction: 'Add 2FA code',
+        secondaryAction: 'Paste otpauth URL',
+        icon: 'totp'
+      }
+    };
+
+    return copy[section] ?? copy.all;
+  }
 </script>
 
 <section class="grid min-h-screen bg-[rgb(var(--background))] lg:grid-cols-[16rem_minmax(0,1fr)]">
@@ -191,45 +268,57 @@
               <span class="text-xs text-[rgb(var(--muted))]">Updated {item.updatedAt}</span>
             </button>
           {:else}
-            <div class="rounded-[var(--radius-md)] border border-dashed border-[rgb(var(--border))] p-4">
-              <p class="text-sm font-medium">No items in {activeSection.label.toLowerCase()}.</p>
-              <p class="mt-1 text-sm text-[rgb(var(--muted))]">
-                Add or import vault data after the Rust storage layer is connected.
-              </p>
-            </div>
+            <VaultEmptyState
+              eyebrow={emptyState.eyebrow}
+              title={emptyState.title}
+              description={emptyState.description}
+              primaryAction={emptyState.primaryAction}
+              secondaryAction={emptyState.secondaryAction}
+              icon={emptyState.icon}
+            />
           {/each}
         </div>
       </section>
 
       <section class="min-w-0 overflow-auto border-t border-[rgb(var(--border))] p-5 md:p-8 xl:border-t-0">
         <div class="mx-auto max-w-3xl">
-          <Badge tone="warning">Scaffold mode</Badge>
-          <div class="mt-4 flex items-start justify-between gap-6">
-            <div>
-              <h2 class="text-2xl font-semibold tracking-normal">Selected item detail</h2>
-              <p class="mt-2 max-w-xl text-sm leading-6 text-[rgb(var(--muted))]">
-                The UI shell is ready for narrow Tauri commands. Real decrypted fields should
-                only be requested for the selected item after the Rust vault is unlocked.
-              </p>
-            </div>
-            <div
-              class="flex h-12 w-12 items-center justify-center rounded-[var(--radius-md)] border border-[rgb(var(--border))] bg-[rgb(var(--surface))]"
-              aria-hidden="true"
-            >
-              <KeyRound size={22} />
-            </div>
-          </div>
-
-          <div class="mt-8 grid gap-4">
-            {#each ['Username', 'Password', 'TOTP', 'Notes'] as label (label)}
-              <div
-                class="rounded-[var(--radius-md)] border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
-              >
-                <p class="text-xs font-medium uppercase text-[rgb(var(--muted))]">{label}</p>
-                <p class="mt-2 text-sm text-[rgb(var(--foreground))]">Connected to Rust command API later</p>
+          {#if filteredItems.length === 0}
+            <VaultEmptyState
+              eyebrow="Nothing selected"
+              title="Choose or create an item"
+              description="The detail pane stays empty until an item summary is selected. Decrypted fields should be requested only for that selected item."
+              primaryAction={emptyState.primaryAction}
+              icon={emptyState.icon}
+            />
+          {:else}
+            <Badge tone="warning">Scaffold mode</Badge>
+            <div class="mt-4 flex items-start justify-between gap-6">
+              <div>
+                <h2 class="text-2xl font-semibold tracking-normal">Selected item detail</h2>
+                <p class="mt-2 max-w-xl text-sm leading-6 text-[rgb(var(--muted))]">
+                  The UI shell is ready for narrow Tauri commands. Real decrypted fields should
+                  only be requested for the selected item after the Rust vault is unlocked.
+                </p>
               </div>
-            {/each}
-          </div>
+              <div
+                class="flex h-12 w-12 items-center justify-center rounded-[var(--radius-md)] border border-[rgb(var(--border))] bg-[rgb(var(--surface))]"
+                aria-hidden="true"
+              >
+                <KeyRound size={22} />
+              </div>
+            </div>
+
+            <div class="mt-8 grid gap-4">
+              {#each ['Username', 'Password', 'TOTP', 'Notes'] as label (label)}
+                <div
+                  class="rounded-[var(--radius-md)] border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
+                >
+                  <p class="text-xs font-medium uppercase text-[rgb(var(--muted))]">{label}</p>
+                  <p class="mt-2 text-sm text-[rgb(var(--foreground))]">Connected to Rust command API later</p>
+                </div>
+              {/each}
+            </div>
+          {/if}
         </div>
       </section>
     </div>

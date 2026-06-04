@@ -32,6 +32,8 @@ These notes adapt the persisted `ui-ux-pro-max` search to the PRD for a SvelteKi
 - Primary workflow: search with Cmd/Ctrl+K, add item, copy field, reveal field, edit, lock vault.
 - TOTP UI: show large tabular 6-digit code, issuer/account label, circular or linear countdown, copy action, and clear near-expiry state using Zinc contrast, labels, and progress treatment. Never show the raw secret after setup unless the user deliberately enters an edit/reveal flow.
 - Empty states should be direct and operational, such as "No passwords yet" or "No 2FA codes yet"; do not use playful illustrations or novelty copy.
+- Use one reusable empty-state component for vault list and detail panes: Zinc dashed container, one Lucide icon, short eyebrow, one sentence of explanatory copy, and one primary action with an optional secondary action.
+- Empty states must never mention or reveal secret values. They can explain the next safe workflow, such as adding a login, importing an encrypted backup, or pasting an `otpauth://` URL after Rust parsing is connected.
 
 ## Security UX
 

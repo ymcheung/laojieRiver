@@ -46,6 +46,7 @@
 - Command/search menu
 - Vault item list
 - Item detail panel
+- Vault empty state
 - Password reveal/copy controls
 - TOTP timer ring
 - Strength meter
@@ -61,3 +62,4 @@
 - Typography: Use Zinc text with strong contrast on Zinc surfaces; use tabular numerals for TOTP and timestamps.
 - Accessibility: Minimum 4.5:1 ratio for normal text, visible keyboard focus, Escape-friendly overlays, and screen-reader labels for icon buttons.
 - Command UX: Cmd/Ctrl+K should find items and actions such as add login, generate password, open settings, and lock vault.
+- Empty States: Use concise, task-specific states for empty filters, first-run vaults, and unselected detail panes. Keep actions visible, avoid blank panels, and use Sky only for the primary action/focus while the container, icon frame, borders, and text remain Zinc.
