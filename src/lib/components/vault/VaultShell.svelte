@@ -192,7 +192,7 @@
   }
 </script>
 
-<section class="relative min-h-screen bg-[rgb(var(--background))] px-4 pb-0 pt-16 sm:px-8">
+<section class="relative min-h-screen bg-[rgb(var(--background))] px-4 pb-0 pt-16 sm:px-8 lg:px-0">
   <a
     class="fixed right-6 top-5 z-10 rounded-[var(--radius-sm)] px-2 py-1 text-sm font-medium text-[rgb(var(--foreground))] transition-colors duration-200 hover:bg-[rgb(var(--surface-muted))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--ring))]"
     href="/settings"
@@ -221,7 +221,8 @@
   </nav>
 
   <div
-    class="mx-auto grid min-h-[calc(100vh-4rem)] max-w-[78rem] grid-cols-1 overflow-hidden rounded-tl-[2rem] lg:grid-cols-[minmax(20rem,35rem)_0.75rem_minmax(0,1fr)]"
+    class="mx-auto grid min-h-[calc(100vh-4rem)] max-w-[78rem] grid-cols-1 overflow-hidden rounded-tl-[2rem] lg:ml-[var(--frame-left)] lg:mr-0 lg:max-w-none lg:grid-cols-[minmax(20rem,35rem)_0.75rem_minmax(0,1fr)]"
+    style="--frame-left: max(1rem, calc(50vw - 624px));"
   >
     <aside class="min-h-[28rem] overflow-auto bg-[rgb(var(--surface))]">
       <header class="border-b border-[rgb(var(--border))] px-5 py-5">

@@ -16,6 +16,7 @@
 - **Max Width:** No marketing max-width cap for the unlocked app shell. Use the full desktop window with comfortable internal constraints.
 - **Layout:** Desktop app layout: persistent left sidebar, top command/search area, vault item list, and detail pane. Collapse to list/detail navigation at narrow widths.
 - **Wireframe Frame:** Use a centered split-pane workspace for vault and settings screens: left pane, explicit Zinc divider, broad right pane, rounded top-left corner on the left pane, and flat Zinc page background.
+- **Right Edge:** On desktop, the split-pane workspace starts at the wireframe-aligned left position and extends to the app viewport's right edge. Do not center it with right-side whitespace.
 - **Vault Navigation Placement:** The All Items/Favorites/Logins/Secure Notes/Cards/Identities/2FA navigation sits outside the split-pane workspace as a separate left rail on desktop. Do not place this navigation inside the left content pane.
 - **Sections:** Navigation groups, search/command bar, add/lock controls, filtered item list, selected item detail, and transient status/toast region.
 
