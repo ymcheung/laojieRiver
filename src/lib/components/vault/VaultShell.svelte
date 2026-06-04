@@ -255,7 +255,7 @@
   </a>
 
   <nav
-    class="mx-auto mb-4 flex max-w-[78rem] flex-wrap gap-1 text-sm lg:absolute lg:top-16 lg:mx-0 lg:mb-0 lg:grid lg:w-36"
+    class="mx-auto mb-4 flex max-w-[78rem] flex-wrap gap-1 px-4 text-sm sm:px-8 lg:px-0 min-[100rem]:absolute min-[100rem]:top-16 min-[100rem]:mx-0 min-[100rem]:mb-0 min-[100rem]:grid min-[100rem]:w-36"
     style="left: max(2rem, calc(50% - 50rem));"
     aria-label="Vault sections"
   >
