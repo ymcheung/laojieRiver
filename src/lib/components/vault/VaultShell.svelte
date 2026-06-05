@@ -130,7 +130,7 @@
 
   const dividerWidth = 12;
   const minLeftPaneWidth = 320;
-  const minRightPaneWidth = 560;
+  const minRightPaneWidth = 512;
   const maxLeftPaneWidth = $derived.by(() => {
     if (!frameElement) return 560;
     return Math.max(minLeftPaneWidth, frameElement.clientWidth - dividerWidth - minRightPaneWidth);
@@ -246,7 +246,9 @@
   }
 </script>
 
-<section class="relative min-h-screen bg-[rgb(var(--background))] px-4 pb-0 pt-16 sm:px-8 lg:px-0">
+<section
+  class="vault-shell relative min-h-screen bg-[rgb(var(--background))] px-4 pb-0 pt-16 sm:px-8 lg:px-0"
+>
   <a
     class="fixed right-6 top-5 z-10 rounded-[var(--radius-sm)] px-2 py-1 text-sm font-medium text-[rgb(var(--foreground))] transition-colors duration-200 hover:bg-[rgb(var(--surface-muted))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--ring))]"
     href="/settings"
@@ -255,8 +257,7 @@
   </a>
 
   <nav
-    class="mx-auto mb-4 flex max-w-[78rem] flex-wrap gap-1 px-4 text-sm sm:px-8 lg:px-0 min-[100rem]:absolute min-[100rem]:top-16 min-[100rem]:mx-0 min-[100rem]:mb-0 min-[100rem]:grid min-[100rem]:w-36"
-    style="left: max(2rem, calc(50% - 50rem));"
+    class="mx-auto mb-4 flex max-w-[78rem] flex-wrap gap-1 px-4 text-sm sm:px-8 lg:absolute lg:top-16 lg:mx-0 lg:mb-0 lg:grid lg:w-[var(--vault-nav-width)] lg:px-0"
     aria-label="Vault sections"
   >
     {#each sections as section (section.id)}
@@ -276,8 +277,7 @@
 
   <div
     bind:this={frameElement}
-    class="mx-auto grid min-h-[calc(100vh-4rem)] max-w-[78rem] grid-cols-1 overflow-hidden rounded-tl-[2rem] lg:ml-[var(--frame-left)] lg:mr-0 lg:max-w-none lg:grid-cols-[var(--split-pane-columns)]"
-    style:--frame-left="max(1rem, calc(50vw - 624px))"
+    class="mx-auto grid min-h-[calc(100vh-4rem)] max-w-[78rem] grid-cols-1 overflow-hidden rounded-tl-[2rem] lg:ml-[var(--vault-workspace-left)] lg:mr-0 lg:max-w-none lg:grid-cols-[var(--split-pane-columns)]"
     style:--split-pane-columns={splitPaneColumns}
   >
     <aside class="min-h-[28rem] overflow-auto bg-[rgb(var(--surface))]">
@@ -398,3 +398,35 @@
     </main>
   </div>
 </section>
+
+<style>
+  .vault-shell {
+    --vault-edge: 1rem;
+    --vault-nav-width: 8rem;
+    --vault-nav-gap: 1rem;
+    --vault-wireframe-left: max(var(--vault-edge), calc(50vw - 624px));
+    --vault-nav-left: max(var(--vault-edge), calc(50vw - 800px));
+    --vault-workspace-left: var(--vault-wireframe-left);
+  }
+
+  @media (min-width: 640px) {
+    .vault-shell {
+      --vault-edge: 2rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .vault-shell {
+      padding-left: 0;
+      padding-right: 0;
+      --vault-workspace-left: max(
+        var(--vault-wireframe-left),
+        calc(var(--vault-nav-left) + var(--vault-nav-width) + var(--vault-nav-gap))
+      );
+    }
+
+    .vault-shell nav {
+      left: var(--vault-nav-left);
+    }
+  }
+</style>
