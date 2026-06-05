@@ -1,31 +1,40 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import { createForm } from '@tanstack/svelte-form';
   import { AlertTriangle } from '@lucide/svelte';
   import Button from '$lib/components/ui/button/Button.svelte';
   import Input from '$lib/components/ui/input/Input.svelte';
   import { vaultApi } from '$lib/features/vault/api';
 
-  let masterPassword = $state('');
-  let confirmPassword = $state('');
-  let passwordsMatch = $derived(masterPassword.length > 0 && masterPassword === confirmPassword);
   let errorMessage = $state('');
-  let isCreating = $state(false);
 
-  async function createVault() {
-    if (!passwordsMatch || isCreating) return;
+  const form = createForm(() => ({
+    defaultValues: {
+      masterPassword: '',
+      confirmPassword: ''
+    },
+    validators: {
+      onChange({ value }) {
+        if (value.confirmPassword.length > 0 && value.masterPassword !== value.confirmPassword) {
+          return 'Master passwords must match.';
+        }
 
-    errorMessage = '';
-    isCreating = true;
+        return undefined;
+      }
+    },
+    onSubmit: async ({ value }) => {
+      errorMessage = '';
 
-    try {
-      await vaultApi.createVault(masterPassword);
-      await goto('/vault');
-    } catch (error) {
-      errorMessage = error instanceof Error ? error.message : 'Could not create vault.';
-    } finally {
-      isCreating = false;
+      try {
+        await vaultApi.createVault(value.masterPassword);
+        await goto('/vault');
+      } catch (error) {
+        errorMessage = error instanceof Error ? error.message : 'Could not create vault.';
+      }
     }
-  }
+  }));
+
+  const formErrorMap = form.useStore((state) => state.errorMap);
 </script>
 
 <main class="grid min-h-screen place-items-center px-6 py-10">
@@ -39,17 +48,64 @@
       class="mt-6 grid gap-4"
       onsubmit={(event) => {
         event.preventDefault();
-        void createVault();
+        event.stopPropagation();
+        void form.handleSubmit();
       }}
     >
-      <label class="grid gap-2 text-sm font-medium">
-        Master password
-        <Input bind:value={masterPassword} autocomplete="new-password" type="password" />
-      </label>
-      <label class="grid gap-2 text-sm font-medium">
-        Confirm master password
-        <Input bind:value={confirmPassword} autocomplete="new-password" type="password" />
-      </label>
+      <form.Field
+        name="masterPassword"
+        validators={{
+          onChange: ({ value }) =>
+            value.length < 12 ? 'Use a longer master password or passphrase.' : undefined
+        }}
+      >
+        {#snippet children(field)}
+          <label class="grid gap-2 text-sm font-medium" for={field.name}>
+            Master password
+            <Input
+              id={field.name}
+              name={field.name}
+              value={field.state.value}
+              autocomplete="new-password"
+              type="password"
+              onblur={field.handleBlur}
+              oninput={(event) => field.handleChange(event.currentTarget.value)}
+            />
+          </label>
+          {#if field.state.meta.errors.length > 0}
+            <p class="rounded-[var(--radius-md)] border border-[rgb(var(--border))] bg-[rgb(var(--surface-muted))] px-3 py-2 text-sm text-[rgb(var(--foreground))]">
+              {field.state.meta.errors.join(', ')}
+            </p>
+          {/if}
+        {/snippet}
+      </form.Field>
+
+      <form.Field
+        name="confirmPassword"
+        validators={{
+          onChange: ({ value }) => (value.length === 0 ? 'Confirm your master password.' : undefined)
+        }}
+      >
+        {#snippet children(field)}
+          <label class="grid gap-2 text-sm font-medium" for={field.name}>
+            Confirm master password
+            <Input
+              id={field.name}
+              name={field.name}
+              value={field.state.value}
+              autocomplete="new-password"
+              type="password"
+              onblur={field.handleBlur}
+              oninput={(event) => field.handleChange(event.currentTarget.value)}
+            />
+          </label>
+          {#if field.state.meta.errors.length > 0}
+            <p class="rounded-[var(--radius-md)] border border-[rgb(var(--border))] bg-[rgb(var(--surface-muted))] px-3 py-2 text-sm text-[rgb(var(--foreground))]">
+              {field.state.meta.errors.join(', ')}
+            </p>
+          {/if}
+        {/snippet}
+      </form.Field>
 
       <div class="flex gap-3 rounded-[var(--radius-md)] border border-[rgb(var(--warning)/0.32)] bg-[rgb(var(--warning)/0.12)] p-4">
         <AlertTriangle class="mt-0.5 shrink-0 text-[rgb(var(--accent-foreground))]" size={18} />
@@ -64,10 +120,20 @@
         </p>
       {/if}
 
+      {#if formErrorMap.current.onChange}
+        <p class="rounded-[var(--radius-md)] border border-[rgb(var(--border))] bg-[rgb(var(--surface-muted))] px-3 py-2 text-sm text-[rgb(var(--foreground))]">
+          {formErrorMap.current.onChange}
+        </p>
+      {/if}
+
       <div class="flex justify-end">
-        <Button disabled={!passwordsMatch || isCreating} type="submit">
-          {isCreating ? 'Creating...' : 'Create local vault'}
-        </Button>
+        <form.Subscribe selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}>
+          {#snippet children(state)}
+            <Button disabled={!state.canSubmit || state.isSubmitting} type="submit">
+              {state.isSubmitting ? 'Creating...' : 'Create local vault'}
+            </Button>
+          {/snippet}
+        </form.Subscribe>
       </div>
     </form>
   </section>

@@ -1,29 +1,28 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import { createForm } from '@tanstack/svelte-form';
   import { LockKeyhole } from '@lucide/svelte';
   import Button from '$lib/components/ui/button/Button.svelte';
   import Input from '$lib/components/ui/input/Input.svelte';
   import { vaultApi } from '$lib/features/vault/api';
 
-  let masterPassword = $state('');
   let errorMessage = $state('');
-  let isUnlocking = $state(false);
 
-  async function unlockVault() {
-    if (masterPassword.length === 0 || isUnlocking) return;
+  const form = createForm(() => ({
+    defaultValues: {
+      masterPassword: ''
+    },
+    onSubmit: async ({ value }) => {
+      errorMessage = '';
 
-    errorMessage = '';
-    isUnlocking = true;
-
-    try {
-      await vaultApi.unlockVault(masterPassword);
-      await goto('/vault');
-    } catch (error) {
-      errorMessage = error instanceof Error ? error.message : 'Could not unlock vault.';
-    } finally {
-      isUnlocking = false;
+      try {
+        await vaultApi.unlockVault(value.masterPassword);
+        await goto('/vault');
+      } catch (error) {
+        errorMessage = error instanceof Error ? error.message : 'Could not unlock vault.';
+      }
     }
-  }
+  }));
 </script>
 
 <main class="grid min-h-screen place-items-center px-6 py-10">
@@ -43,13 +42,36 @@
       class="mt-6 grid gap-4"
       onsubmit={(event) => {
         event.preventDefault();
-        void unlockVault();
+        event.stopPropagation();
+        void form.handleSubmit();
       }}
     >
-      <label class="grid gap-2 text-sm font-medium">
-        Master password
-        <Input bind:value={masterPassword} autocomplete="current-password" type="password" />
-      </label>
+      <form.Field
+        name="masterPassword"
+        validators={{
+          onChange: ({ value }) => (value.length === 0 ? 'Master password is required.' : undefined)
+        }}
+      >
+        {#snippet children(field)}
+          <label class="grid gap-2 text-sm font-medium" for={field.name}>
+            Master password
+            <Input
+              id={field.name}
+              name={field.name}
+              value={field.state.value}
+              autocomplete="current-password"
+              type="password"
+              onblur={field.handleBlur}
+              oninput={(event) => field.handleChange(event.currentTarget.value)}
+            />
+          </label>
+          {#if field.state.meta.errors.length > 0}
+            <p class="rounded-[var(--radius-md)] border border-[rgb(var(--border))] bg-[rgb(var(--surface-muted))] px-3 py-2 text-sm text-[rgb(var(--foreground))]">
+              {field.state.meta.errors.join(', ')}
+            </p>
+          {/if}
+        {/snippet}
+      </form.Field>
 
       {#if errorMessage}
         <p class="rounded-[var(--radius-md)] border border-[rgb(var(--border))] bg-[rgb(var(--surface-muted))] px-3 py-2 text-sm text-[rgb(var(--foreground))]">
@@ -57,9 +79,13 @@
         </p>
       {/if}
 
-      <Button class="w-full" disabled={masterPassword.length === 0 || isUnlocking} type="submit">
-        {isUnlocking ? 'Unlocking...' : 'Unlock'}
-      </Button>
+      <form.Subscribe selector={(state) => ({ canSubmit: state.canSubmit, isSubmitting: state.isSubmitting })}>
+        {#snippet children(state)}
+          <Button class="w-full" disabled={!state.canSubmit || state.isSubmitting} type="submit">
+            {state.isSubmitting ? 'Unlocking...' : 'Unlock'}
+          </Button>
+        {/snippet}
+      </form.Subscribe>
     </form>
   </section>
 </main>
