@@ -1,120 +1,44 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
   import { page } from '$app/state';
+  import { onMount } from 'svelte';
   import {
     Archive,
     Brush,
     Clock,
     Download,
+    FlaskConical,
     KeyRound,
     LockKeyhole,
     Monitor,
     ShieldCheck
   } from '@lucide/svelte';
   import Button from '$lib/components/ui/button/Button.svelte';
+  import { disableDemoMode, isDemoModeEnabled } from '$lib/features/demoMode';
+  import SplitPaneSeparator from '$lib/features/splitPane/SplitPaneSeparator.svelte';
+  import { createSplitPane } from '$lib/features/splitPane/createSplitPane.svelte';
+  import { settingsSections, type SettingsSection } from '$lib/features/settings/sections';
   import { cn } from '$lib/utils/cn';
 
-  type SettingsSection = {
-    id: string;
-    label: string;
-    description: string;
-    icon: 'security' | 'appearance' | 'backup' | 'import-export' | 'clipboard' | 'auto-lock';
-  };
-
-  const sections: SettingsSection[] = [
-    {
-      id: 'security',
-      label: 'Security',
-      description: 'Master password, vault lock behavior, and recovery limits.',
-      icon: 'security'
-    },
-    {
-      id: 'appearance',
-      label: 'Appearance',
-      description: 'Theme, density, and window preferences.',
-      icon: 'appearance'
-    },
-    {
-      id: 'backup',
-      label: 'Backup',
-      description: 'Encrypted backup destinations and restore checks.',
-      icon: 'backup'
-    },
-    {
-      id: 'import-export',
-      label: 'Import / Export',
-      description: 'CSV, encrypted archive, and plaintext export warnings.',
-      icon: 'import-export'
-    },
-    {
-      id: 'clipboard',
-      label: 'Clipboard',
-      description: 'Copy timeout and clear-after-copy behavior.',
-      icon: 'clipboard'
-    },
-    {
-      id: 'auto-lock',
-      label: 'Auto-lock',
-      description: 'Inactivity, sleep, background, and restart locking.',
-      icon: 'auto-lock'
-    }
-  ];
-
   const activeId = $derived(page.url.searchParams.get('section') ?? 'security');
-  const activeSection = $derived(sections.find((section) => section.id === activeId) ?? sections[0]);
-  let frameElement: HTMLElement | undefined = $state();
-  let leftPaneWidth = $state(440);
-
-  const dividerWidth = 12;
-  const minLeftPaneWidth = 320;
-  const minRightPaneWidth = 560;
-  const maxLeftPaneWidth = $derived.by(() => {
-    if (!frameElement) return 560;
-    return Math.max(minLeftPaneWidth, frameElement.clientWidth - dividerWidth - minRightPaneWidth);
+  const activeSection = $derived(
+    settingsSections.find((section) => section.id === activeId) ?? settingsSections[0]
+  );
+  const splitPane = createSplitPane({
+    minLeftPaneWidth: 320,
+    minRightPaneWidth: 560
   });
-  const constrainedLeftPaneWidth = $derived(
-    Math.min(Math.max(leftPaneWidth, minLeftPaneWidth), maxLeftPaneWidth)
-  );
-  const splitPaneColumns = $derived(
-    `${constrainedLeftPaneWidth}px ${dividerWidth}px minmax(${minRightPaneWidth}px, 1fr)`
-  );
+  let demoModeEnabled = $state(false);
 
-  function resizeLeftPane(clientX: number) {
-    if (!frameElement) return;
-
-    const frameRect = frameElement.getBoundingClientRect();
-    leftPaneWidth = Math.min(
-      Math.max(clientX - frameRect.left, minLeftPaneWidth),
-      frameRect.width - dividerWidth - minRightPaneWidth
-    );
+  async function turnOffDemoMode() {
+    disableDemoMode();
+    demoModeEnabled = false;
+    await goto('/');
   }
 
-  function startResize(event: PointerEvent) {
-    if (!frameElement) return;
-
-    event.preventDefault();
-    resizeLeftPane(event.clientX);
-
-    function handlePointerMove(moveEvent: PointerEvent) {
-      resizeLeftPane(moveEvent.clientX);
-    }
-
-    function stopResize() {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', stopResize);
-    }
-
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', stopResize, { once: true });
-  }
-
-  function resizeWithKeyboard(event: KeyboardEvent) {
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-
-    event.preventDefault();
-    const direction = event.key === 'ArrowLeft' ? -1 : 1;
-    const step = event.shiftKey ? 48 : 24;
-    leftPaneWidth = Math.min(Math.max(leftPaneWidth + direction * step, minLeftPaneWidth), maxLeftPaneWidth);
-  }
+  onMount(() => {
+    demoModeEnabled = isDemoModeEnabled();
+  });
 </script>
 
 {#snippet settingsIcon(icon: SettingsSection['icon'])}
@@ -128,6 +52,8 @@
     <Download size={18} />
   {:else if icon === 'clipboard'}
     <KeyRound size={18} />
+  {:else if icon === 'demo'}
+    <FlaskConical size={18} />
   {:else}
     <Clock size={18} />
   {/if}
@@ -143,10 +69,10 @@
   </div>
 
   <section
-    bind:this={frameElement}
+    bind:this={splitPane.frameElement}
     class="mx-auto grid min-h-[calc(100vh-4rem)] max-w-[78rem] grid-cols-1 overflow-hidden rounded-tl-[2rem] lg:ml-[var(--frame-left)] lg:mr-0 lg:max-w-none lg:grid-cols-[var(--split-pane-columns)]"
     style:--frame-left="max(1rem, calc(50vw - 624px))"
-    style:--split-pane-columns={splitPaneColumns}
+    style:--split-pane-columns={splitPane.gridColumns}
   >
     <aside class="min-h-[28rem] overflow-auto bg-[rgb(var(--surface))]">
       <div class="border-b border-[rgb(var(--border))] px-5 py-5">
@@ -163,7 +89,7 @@
       </div>
 
       <nav class="grid gap-1 p-3 text-sm" aria-label="Settings sections">
-        {#each sections as section (section.id)}
+        {#each settingsSections as section (section.id)}
           <a
             aria-current={activeSection.id === section.id ? 'page' : undefined}
             class={cn(
@@ -190,24 +116,14 @@
       </nav>
     </aside>
 
-    <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions - focusable separators are the ARIA pattern for resizable split panes. -->
-    <div
-      class="group relative hidden cursor-col-resize touch-none bg-[rgb(var(--surface-strong))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[rgb(var(--ring))] lg:block"
-      role="separator"
-      tabindex="0"
-      aria-label="Resize settings columns"
-      aria-orientation="vertical"
-      aria-valuemin={minLeftPaneWidth}
-      aria-valuemax={maxLeftPaneWidth}
-      aria-valuenow={constrainedLeftPaneWidth}
-      onpointerdown={startResize}
-      onkeydown={resizeWithKeyboard}
-    >
-      <span
-        class="absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 bg-transparent transition-colors duration-200 group-hover:bg-[rgb(var(--muted))] group-focus-visible:bg-[rgb(var(--muted))]"
-        aria-hidden="true"
-      ></span>
-    </div>
+    <SplitPaneSeparator
+      label="Resize settings columns"
+      min={splitPane.minLeftPaneWidth}
+      max={splitPane.maxLeftPaneWidth}
+      value={splitPane.constrainedLeftPaneWidth}
+      onpointerdown={splitPane.startResize}
+      onkeydown={splitPane.resizeWithKeyboard}
+    />
 
     <section class="min-h-[28rem] overflow-auto bg-[rgb(var(--surface))] p-5 md:p-8">
       <div class="mx-auto max-w-3xl">
@@ -230,19 +146,55 @@
         </div>
 
         <div class="mt-8 grid gap-4">
-          <section
-            class="rounded-[var(--radius-md)] border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
-          >
-            <div class="flex items-center justify-between gap-4">
-              <div>
-                <h2 class="text-sm font-semibold">Status</h2>
-                <p class="mt-1 text-sm leading-6 text-[rgb(var(--muted))]">
-                  This settings surface is ready for Tauri command integration.
-                </p>
+          {#if activeSection.id === 'demo'}
+            <section
+              class="rounded-[var(--radius-md)] border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
+            >
+              <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 class="text-sm font-semibold">Demo vault access</h2>
+                  <p class="mt-1 text-sm leading-6 text-[rgb(var(--muted))]">
+                    Demo mode uses local sample data only. Turn it off to return to the startup
+                    screen for real user onboarding and future Neon Auth sign-in.
+                  </p>
+                </div>
+                <div class="flex shrink-0 items-center gap-3">
+                  <span
+                    class={cn(
+                      'inline-flex h-8 items-center rounded-[var(--radius-sm)] border px-3 text-sm font-medium',
+                      demoModeEnabled
+                        ? 'border-[rgb(var(--primary)/0.28)] bg-[rgb(var(--primary)/0.12)] text-[rgb(var(--accent-foreground))]'
+                        : 'border-[rgb(var(--border))] bg-[rgb(var(--surface-muted))] text-[rgb(var(--muted))]'
+                    )}
+                  >
+                    {demoModeEnabled ? 'On' : 'Off'}
+                  </span>
+                  <Button
+                    disabled={!demoModeEnabled}
+                    variant="secondary"
+                    size="sm"
+                    onclick={() => void turnOffDemoMode()}
+                  >
+                    Turn off
+                  </Button>
+                </div>
               </div>
-              <Button variant="secondary" size="sm">Configure</Button>
-            </div>
-          </section>
+            </section>
+          {:else}
+            <section
+              class="rounded-[var(--radius-md)] border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
+            >
+              <div class="flex items-center justify-between gap-4">
+                <div>
+                  <h2 class="text-sm font-semibold">Status</h2>
+                  <p class="mt-1 text-sm leading-6 text-[rgb(var(--muted))]">
+                    This settings surface is ready for Tauri command integration.
+                  </p>
+                </div>
+                <Button variant="secondary" size="sm">Configure</Button>
+              </div>
+            </section>
+          {/if}
 
           <section
             class="rounded-[var(--radius-md)] border border-dashed border-[rgb(var(--border))] bg-[rgb(var(--surface)/0.74)] p-4"

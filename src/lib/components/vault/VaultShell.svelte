@@ -1,118 +1,25 @@
 <script lang="ts">
   import { page } from '$app/state';
+  import { onMount } from 'svelte';
   import { KeyRound, Lock, Plus, Search } from '@lucide/svelte';
   import Badge from '$lib/components/ui/badge/Badge.svelte';
   import Button from '$lib/components/ui/button/Button.svelte';
   import Input from '$lib/components/ui/input/Input.svelte';
   import VaultEmptyState from '$lib/components/vault/VaultEmptyState.svelte';
-  import type { VaultItemSummary } from '$lib/features/vault/types';
+  import { isDemoModeEnabled } from '$lib/features/demoMode';
+  import SplitPaneSeparator from '$lib/features/splitPane/SplitPaneSeparator.svelte';
+  import { createSplitPane } from '$lib/features/splitPane/createSplitPane.svelte';
+  import { demoVaultItems } from '$lib/features/vault/demoItems';
+  import { getVaultEmptyState } from '$lib/features/vault/emptyStates';
+  import { vaultSections } from '$lib/features/vault/navigation';
   import { cn } from '$lib/utils/cn';
 
-  type VaultSection = {
-    id: string;
-    label: string;
-    href: string;
-    description: string;
-  };
-
-  type EmptyStateContent = {
-    eyebrow: string;
-    title: string;
-    description: string;
-    primaryAction: string;
-    secondaryAction?: string;
-    icon: 'key' | 'star' | 'note' | 'card' | 'identity' | 'totp';
-  };
-
-  const sections: VaultSection[] = [
-    {
-      id: 'all',
-      label: 'All Items',
-      href: '/vault',
-      description: 'All unlocked item summaries'
-    },
-    {
-      id: 'favorites',
-      label: 'Favorites',
-      href: '/vault?section=favorites',
-      description: 'Pinned item summaries'
-    },
-    {
-      id: 'logins',
-      label: 'Logins',
-      href: '/vault?section=logins',
-      description: 'Password login items'
-    },
-    {
-      id: 'secure-notes',
-      label: 'Secure Notes',
-      href: '/vault?section=secure-notes',
-      description: 'Encrypted note items'
-    },
-    {
-      id: 'cards',
-      label: 'Cards',
-      href: '/vault?section=cards',
-      description: 'Payment card items'
-    },
-    {
-      id: 'identities',
-      label: 'Identities',
-      href: '/vault?section=identities',
-      description: 'Identity profile items'
-    },
-    {
-      id: '2fa',
-      label: '2FA',
-      href: '/vault?section=2fa',
-      description: 'Items with TOTP codes'
-    }
-  ];
-
-  const items: VaultItemSummary[] = [
-    {
-      id: 'sample-1',
-      kind: 'login',
-      title: 'GitHub',
-      username: 'security@example.com',
-      favorite: true,
-      updatedAt: 'Today'
-    },
-    {
-      id: 'sample-2',
-      kind: 'login',
-      title: 'Neon',
-      username: 'sync@example.com',
-      favorite: false,
-      updatedAt: 'Yesterday'
-    },
-    {
-      id: 'sample-3',
-      kind: 'secure_note',
-      title: 'Recovery codes',
-      favorite: false,
-      updatedAt: 'Last week'
-    },
-    {
-      id: 'sample-4',
-      kind: 'card',
-      title: 'Travel card',
-      favorite: false,
-      updatedAt: 'May 28'
-    },
-    {
-      id: 'sample-5',
-      kind: 'identity',
-      title: 'Personal identity',
-      favorite: false,
-      updatedAt: 'May 18'
-    }
-  ];
-
   const sectionId = $derived(page.url.searchParams.get('section') ?? 'all');
-  const activeSection = $derived(sections.find((section) => section.id === sectionId) ?? sections[0]);
+  const activeSection = $derived(
+    vaultSections.find((section) => section.id === sectionId) ?? vaultSections[0]
+  );
   const filteredItems = $derived(
-    items.filter((item) => {
+    demoVaultItems.filter((item) => {
       if (activeSection.id === 'all') return true;
       if (activeSection.id === 'favorites') return item.favorite;
       if (activeSection.id === 'logins') return item.kind === 'login';
@@ -124,132 +31,25 @@
     })
   );
 
-  const emptyState = $derived(getEmptyState(activeSection.id));
-  let frameElement: HTMLDivElement | undefined = $state();
-  let leftPaneWidth = $state(440);
-
-  const dividerWidth = 12;
-  const minLeftPaneWidth = 320;
-  const minRightPaneWidth = 512;
-  const maxLeftPaneWidth = $derived.by(() => {
-    if (!frameElement) return 560;
-    return Math.max(minLeftPaneWidth, frameElement.clientWidth - dividerWidth - minRightPaneWidth);
+  const emptyState = $derived(getVaultEmptyState(activeSection.id));
+  const splitPane = createSplitPane({
+    minLeftPaneWidth: 320,
+    minRightPaneWidth: 512
   });
-  const constrainedLeftPaneWidth = $derived(
-    Math.min(Math.max(leftPaneWidth, minLeftPaneWidth), maxLeftPaneWidth)
-  );
-  const splitPaneColumns = $derived(
-    `${constrainedLeftPaneWidth}px ${dividerWidth}px minmax(${minRightPaneWidth}px, 1fr)`
-  );
+  let demoModeEnabled = $state(false);
 
-  function getEmptyState(section: string): EmptyStateContent {
-    const copy: Record<string, EmptyStateContent> = {
-      all: {
-        eyebrow: 'Vault is ready',
-        title: 'No items in this vault yet',
-        description:
-          'Create a login, secure note, card, identity, or 2FA entry after the Rust vault storage layer is connected.',
-        primaryAction: 'New item',
-        secondaryAction: 'Import backup',
-        icon: 'key'
-      },
-      favorites: {
-        eyebrow: 'Pinned items',
-        title: 'No favorites yet',
-        description:
-          'Mark high-priority items as favorites so they stay easy to reach without exposing secret details in the list.',
-        primaryAction: 'Browse all items',
-        icon: 'star'
-      },
-      logins: {
-        eyebrow: 'Passwords',
-        title: 'No login items yet',
-        description:
-          'Add your first login once encrypted item creation is available. Password generation should stay on the Rust side.',
-        primaryAction: 'Add login',
-        icon: 'key'
-      },
-      'secure-notes': {
-        eyebrow: 'Encrypted notes',
-        title: 'No secure notes yet',
-        description:
-          'Use secure notes for recovery codes or private text that should be encrypted with the vault key.',
-        primaryAction: 'Add secure note',
-        icon: 'note'
-      },
-      cards: {
-        eyebrow: 'Payment cards',
-        title: 'No cards saved yet',
-        description:
-          'Store card details only after encrypted storage, field masking, and explicit reveal controls are implemented.',
-        primaryAction: 'Add card',
-        icon: 'card'
-      },
-      identities: {
-        eyebrow: 'Profiles',
-        title: 'No identities yet',
-        description:
-          'Identity items can hold profile details for form filling later. Keep summaries minimal while the vault is locked.',
-        primaryAction: 'Add identity',
-        icon: 'identity'
-      },
-      '2fa': {
-        eyebrow: 'TOTP',
-        title: 'No 2FA codes yet',
-        description:
-          'Paste an otpauth URL or add a secret manually once TOTP parsing is implemented in Rust.',
-        primaryAction: 'Add 2FA code',
-        secondaryAction: 'Paste otpauth URL',
-        icon: 'totp'
-      }
-    };
-
-    return copy[section] ?? copy.all;
-  }
-
-  function resizeLeftPane(clientX: number) {
-    if (!frameElement) return;
-
-    const frameRect = frameElement.getBoundingClientRect();
-    leftPaneWidth = Math.min(
-      Math.max(clientX - frameRect.left, minLeftPaneWidth),
-      frameRect.width - dividerWidth - minRightPaneWidth
-    );
-  }
-
-  function startResize(event: PointerEvent) {
-    if (!frameElement) return;
-
-    event.preventDefault();
-    resizeLeftPane(event.clientX);
-
-    function handlePointerMove(moveEvent: PointerEvent) {
-      resizeLeftPane(moveEvent.clientX);
-    }
-
-    function stopResize() {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', stopResize);
-    }
-
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', stopResize, { once: true });
-  }
-
-  function resizeWithKeyboard(event: KeyboardEvent) {
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-
-    event.preventDefault();
-    const direction = event.key === 'ArrowLeft' ? -1 : 1;
-    const step = event.shiftKey ? 48 : 24;
-    leftPaneWidth = Math.min(Math.max(leftPaneWidth + direction * step, minLeftPaneWidth), maxLeftPaneWidth);
-  }
+  onMount(() => {
+    demoModeEnabled = isDemoModeEnabled();
+  });
 </script>
 
 <section
   class="vault-shell relative min-h-screen bg-[rgb(var(--background))] px-4 pb-0 pt-16 sm:px-8 lg:px-0"
 >
   <div class="fixed left-4 right-4 top-4 z-10 flex h-9 items-center justify-end gap-2.5 sm:left-auto sm:right-6">
+    {#if demoModeEnabled}
+      <Badge tone="accent">Demo</Badge>
+    {/if}
     <div class="relative min-w-0 flex-1 sm:w-72 sm:flex-none lg:w-80">
       <Search
         class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[rgb(var(--muted))]"
@@ -261,19 +61,28 @@
       <Lock size={16} />
       <span class="hidden sm:inline">Lock</span>
     </Button>
-    <a
-      class="inline-flex h-9 items-center rounded-[var(--radius-sm)] px-2.5 text-sm font-medium text-[rgb(var(--foreground))] transition-colors duration-200 hover:bg-[rgb(var(--surface-muted))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--ring))]"
-      href="/settings"
-    >
-      Settings
-    </a>
+    {#if demoModeEnabled}
+      <a
+        class="inline-flex h-9 items-center rounded-[var(--radius-sm)] px-2.5 text-sm font-medium text-[rgb(var(--foreground))] transition-colors duration-200 hover:bg-[rgb(var(--surface-muted))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--ring))]"
+        href="/settings?section=demo"
+      >
+        Settings
+      </a>
+    {:else}
+      <a
+        class="inline-flex h-9 items-center rounded-[var(--radius-sm)] px-2.5 text-sm font-medium text-[rgb(var(--foreground))] transition-colors duration-200 hover:bg-[rgb(var(--surface-muted))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--ring))]"
+        href="/settings"
+      >
+        Settings
+      </a>
+    {/if}
   </div>
 
   <nav
     class="mx-auto flex max-w-[78rem] flex-wrap gap-1 px-4 pb-4 text-sm sm:px-8 lg:absolute lg:top-16 lg:mx-0 lg:grid lg:w-[var(--vault-nav-width)] lg:px-0 lg:pb-0"
     aria-label="Vault sections"
   >
-    {#each sections as section (section.id)}
+    {#each vaultSections as section (section.id)}
       <a
         aria-current={activeSection.id === section.id ? 'page' : undefined}
         class={cn(
@@ -289,9 +98,9 @@
   </nav>
 
   <div
-    bind:this={frameElement}
+    bind:this={splitPane.frameElement}
     class="mx-auto grid min-h-[calc(100vh-4rem)] max-w-[78rem] grid-cols-1 overflow-hidden rounded-tl-[2rem] lg:ml-[var(--vault-workspace-left)] lg:mr-0 lg:max-w-none lg:grid-cols-[var(--split-pane-columns)]"
-    style:--split-pane-columns={splitPaneColumns}
+    style:--split-pane-columns={splitPane.gridColumns}
   >
     <aside class="min-h-[28rem] overflow-auto bg-[rgb(var(--surface))]">
       <header class="border-b border-[rgb(var(--border))] px-5 py-5">
@@ -338,24 +147,14 @@
       </section>
     </aside>
 
-    <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions - focusable separators are the ARIA pattern for resizable split panes. -->
-    <div
-      class="group relative hidden cursor-col-resize touch-none bg-[rgb(var(--surface-strong))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[rgb(var(--ring))] lg:block"
-      role="separator"
-      tabindex="0"
-      aria-label="Resize vault columns"
-      aria-orientation="vertical"
-      aria-valuemin={minLeftPaneWidth}
-      aria-valuemax={maxLeftPaneWidth}
-      aria-valuenow={constrainedLeftPaneWidth}
-      onpointerdown={startResize}
-      onkeydown={resizeWithKeyboard}
-    >
-      <span
-        class="absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 bg-transparent transition-colors duration-200 group-hover:bg-[rgb(var(--muted))] group-focus-visible:bg-[rgb(var(--muted))]"
-        aria-hidden="true"
-      ></span>
-    </div>
+    <SplitPaneSeparator
+      label="Resize vault columns"
+      min={splitPane.minLeftPaneWidth}
+      max={splitPane.maxLeftPaneWidth}
+      value={splitPane.constrainedLeftPaneWidth}
+      onpointerdown={splitPane.startResize}
+      onkeydown={splitPane.resizeWithKeyboard}
+    />
 
     <main class="min-h-[28rem] overflow-auto bg-[rgb(var(--surface))] p-5 md:p-8">
       <div class="mx-auto max-w-3xl">

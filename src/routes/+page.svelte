@@ -1,6 +1,11 @@
 <script lang="ts">
-  import { ArrowRight, DatabaseZap, Shield, UserRoundCheck } from '@lucide/svelte';
+  import { ArrowRight, DatabaseZap, FlaskConical, Shield, UserRoundCheck } from '@lucide/svelte';
   import Badge from '$lib/components/ui/badge/Badge.svelte';
+  import { enableDemoMode } from '$lib/features/demoMode';
+
+  function startDemoMode() {
+    enableDemoMode();
+  }
 </script>
 
 <main class="min-h-screen px-6 py-6">
@@ -28,6 +33,34 @@
           href="/unlock"
         >
           Unlock existing vault
+        </a>
+      </div>
+
+      <div
+        class="mt-5 flex max-w-2xl flex-col gap-3 rounded-[var(--radius-md)] border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <div class="flex min-w-0 gap-3">
+          <span
+            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-sm)] border border-[rgb(var(--border))] text-[rgb(var(--accent-foreground))]"
+            aria-hidden="true"
+          >
+            <FlaskConical size={18} />
+          </span>
+          <div class="min-w-0">
+            <h2 class="text-sm font-semibold text-[rgb(var(--foreground))]">Try the demo vault</h2>
+            <p class="mt-1 text-sm leading-6 text-[rgb(var(--muted))]">
+              Open the product shell with sample items while the real user account path stays reserved
+              for Neon Auth.
+            </p>
+          </div>
+        </div>
+        <a
+          class="inline-flex h-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-[var(--radius-md)] border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 text-sm font-medium text-[rgb(var(--foreground))] transition-colors duration-200 hover:bg-[rgb(var(--surface-muted))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--ring))]"
+          href="/vault"
+          onclick={startDemoMode}
+        >
+          Start demo
+          <ArrowRight size={16} />
         </a>
       </div>
     </div>
