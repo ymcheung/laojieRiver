@@ -249,20 +249,20 @@
 <section
   class="vault-shell relative min-h-screen bg-[rgb(var(--background))] px-4 pb-0 pt-16 sm:px-8 lg:px-0"
 >
-  <div class="fixed left-4 right-4 top-5 z-10 flex items-center justify-end gap-2 sm:left-auto sm:right-6">
+  <div class="fixed left-4 right-4 top-4 z-10 flex h-9 items-center justify-end gap-2.5 sm:left-auto sm:right-6">
     <div class="relative min-w-0 flex-1 sm:w-72 sm:flex-none lg:w-80">
       <Search
         class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[rgb(var(--muted))]"
         size={16}
       />
-      <Input aria-label="Search vault items" class="h-8 pl-9" placeholder="Search items" />
+      <Input inputSize="sm" aria-label="Search vault items" class="pl-9" placeholder="Search items" />
     </div>
-    <Button variant="ghost" size="sm">
+    <Button class="h-9 px-3" variant="ghost" size="sm">
       <Lock size={16} />
       <span class="hidden sm:inline">Lock</span>
     </Button>
     <a
-      class="rounded-[var(--radius-sm)] px-2 py-1 text-sm font-medium text-[rgb(var(--foreground))] transition-colors duration-200 hover:bg-[rgb(var(--surface-muted))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--ring))]"
+      class="inline-flex h-9 items-center rounded-[var(--radius-sm)] px-2.5 text-sm font-medium text-[rgb(var(--foreground))] transition-colors duration-200 hover:bg-[rgb(var(--surface-muted))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--ring))]"
       href="/settings"
     >
       Settings
@@ -270,7 +270,7 @@
   </div>
 
   <nav
-    class="mx-auto mb-4 flex max-w-[78rem] flex-wrap gap-1 px-4 text-sm sm:px-8 lg:absolute lg:top-16 lg:mx-0 lg:mb-0 lg:grid lg:w-[var(--vault-nav-width)] lg:px-0"
+    class="mx-auto flex max-w-[78rem] flex-wrap gap-1 px-4 pb-4 text-sm sm:px-8 lg:absolute lg:top-16 lg:mx-0 lg:grid lg:w-[var(--vault-nav-width)] lg:px-0 lg:pb-0"
     aria-label="Vault sections"
   >
     {#each sections as section (section.id)}
