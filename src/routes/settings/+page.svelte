@@ -134,11 +134,13 @@
 {/snippet}
 
 <main class="min-h-screen bg-[rgb(var(--background))] px-4 pb-0 pt-16 sm:px-8 lg:px-0">
-  <span
-    class="fixed right-6 top-5 z-10 rounded-[var(--radius-sm)] px-2 py-1 text-sm font-medium text-[rgb(var(--foreground))] transition-colors duration-200 hover:bg-[rgb(var(--surface-muted))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--ring))]"
-  >
-    Settings
-  </span>
+  <div class="fixed left-4 right-4 top-4 z-10 flex h-9 items-center justify-end gap-2.5 sm:left-auto sm:right-6">
+    <span
+      class="inline-flex h-9 items-center rounded-[var(--radius-sm)] px-2.5 text-sm font-medium text-[rgb(var(--foreground))]"
+    >
+      Settings
+    </span>
+  </div>
 
   <section
     bind:this={frameElement}
