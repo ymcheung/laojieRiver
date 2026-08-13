@@ -6,15 +6,16 @@ use std::sync::Mutex;
 
 use commands::{
     clipboard_commands::copy_password,
+    hide_my_email_commands::list_hide_my_email_aliases,
     item_commands::{get_item, list_items},
     settings_commands::generate_password,
     vault_commands::{create_vault, get_vault_state, lock_vault, unlock_vault},
 };
+use core::vault::Vault;
 
 #[derive(Default)]
 pub struct AppState {
-    pub vault_exists: bool,
-    pub unlocked: bool,
+    pub vault: Option<Vault>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -27,6 +28,7 @@ pub fn run() {
             create_vault,
             unlock_vault,
             lock_vault,
+            list_hide_my_email_aliases,
             list_items,
             get_item,
             copy_password,
@@ -35,4 +37,3 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running LaoJie River");
 }
-

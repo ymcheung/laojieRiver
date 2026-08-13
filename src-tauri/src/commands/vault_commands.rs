@@ -3,7 +3,13 @@ use std::sync::Mutex;
 use serde::Serialize;
 use tauri::State;
 
-use crate::{core::errors::AppError, AppState};
+use uuid::Uuid;
+use zeroize::Zeroizing;
+
+use crate::{
+    core::{errors::AppError, vault::Vault},
+    AppState,
+};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,8 +23,8 @@ pub async fn get_vault_state(state: State<'_, Mutex<AppState>>) -> Result<VaultS
     let state = state.lock().map_err(|_| AppError::Internal)?;
 
     Ok(VaultState {
-        has_vault: state.vault_exists,
-        unlocked: state.unlocked,
+        has_vault: state.vault.is_some(),
+        unlocked: state.vault.as_ref().is_some_and(Vault::is_unlocked),
     })
 }
 
@@ -27,16 +33,16 @@ pub async fn create_vault(
     master_password: String,
     state: State<'_, Mutex<AppState>>,
 ) -> Result<(), AppError> {
-    if master_password.len() < 12 {
-        return Err(AppError::Validation(
-            "Use a longer master password or passphrase.".into(),
-        ));
-    }
-
+    let master_password = Zeroizing::new(master_password);
     let mut state = state.lock().map_err(|_| AppError::Internal)?;
-    state.vault_exists = true;
-    state.unlocked = true;
+    create_vault_in_state(&mut state, &master_password)
+}
 
+fn create_vault_in_state(state: &mut AppState, master_password: &str) -> Result<(), AppError> {
+    if state.vault.is_some() {
+        return Err(AppError::VaultExists);
+    }
+    state.vault = Some(Vault::create(&Uuid::new_v4().to_string(), master_password)?);
     Ok(())
 }
 
@@ -49,19 +55,40 @@ pub async fn unlock_vault(
         return Err(AppError::Validation("Master password is required.".into()));
     }
 
-    let mut state = state.lock().map_err(|_| AppError::Internal)?;
-    if !state.vault_exists {
-        return Err(AppError::VaultUnavailable);
-    }
-
-    state.unlocked = true;
-    Ok(())
+    let master_password = Zeroizing::new(master_password);
+    state
+        .lock()
+        .map_err(|_| AppError::Internal)?
+        .vault
+        .as_mut()
+        .ok_or(AppError::VaultUnavailable)?
+        .unlock(&master_password)
+        .map_err(Into::into)
 }
 
 #[tauri::command]
 pub async fn lock_vault(state: State<'_, Mutex<AppState>>) -> Result<(), AppError> {
     let mut state = state.lock().map_err(|_| AppError::Internal)?;
-    state.unlocked = false;
+    state
+        .vault
+        .as_mut()
+        .ok_or(AppError::VaultUnavailable)?
+        .lock();
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn creating_a_second_vault_is_rejected() {
+        let mut state = AppState::default();
+        create_vault_in_state(&mut state, "correct horse battery staple").unwrap();
+
+        assert!(matches!(
+            create_vault_in_state(&mut state, "another correct horse battery staple"),
+            Err(AppError::VaultExists)
+        ));
+    }
+}

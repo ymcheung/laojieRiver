@@ -1,2 +1,336 @@
-//! Vault create, unlock, lock, backup, import, and item encryption lifecycle.
+use std::{
+    collections::BTreeMap,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
+use serde::{Deserialize, Serialize};
+use thiserror::Error;
+use uuid::Uuid;
+use zeroize::Zeroizing;
+
+use crate::core::{
+    crypto::{decrypt, derive_key, encrypt, random_bytes, EncryptedEnvelope, KdfParams, KEY_LEN},
+    hide_my_email::HideMyEmailAlias,
+};
+
+const SALT_LEN: usize = 16;
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct VaultMetadata {
+    kdf: KdfParams,
+    salt: Vec<u8>,
+    wrapped_key: EncryptedEnvelope,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct EncryptedRecord {
+    id: String,
+    revision: u64,
+    updated_at: u64,
+    envelope: EncryptedEnvelope,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg(test)]
+pub(crate) struct SyncBundle {
+    vault_id: String,
+    metadata: VaultMetadata,
+    records: Vec<EncryptedRecord>,
+}
+
+#[cfg(test)]
+pub(crate) trait SyncStore {
+    fn get(&self, vault_id: &str) -> Option<SyncBundle>;
+    fn put(&mut self, bundle: SyncBundle);
+}
+
+#[cfg(test)]
+#[derive(Default)]
+pub struct MemorySyncStore(BTreeMap<String, SyncBundle>);
+
+#[cfg(test)]
+impl MemorySyncStore {
+    pub fn wire_bytes(&self, vault_id: &str) -> Result<Vec<u8>, VaultError> {
+        let bundle = self.0.get(vault_id).ok_or(VaultError::NotFound)?;
+        let mut bytes = serde_json::to_vec(bundle).map_err(|_| VaultError::InvalidData)?;
+        bytes.extend_from_slice(&bundle.metadata.wrapped_key.ciphertext);
+        for record in &bundle.records {
+            bytes.extend_from_slice(&record.envelope.ciphertext);
+        }
+        Ok(bytes)
+    }
+
+    pub fn set_kdf_memory(&mut self, vault_id: &str, memory_kib: u32) -> Result<(), VaultError> {
+        self.0
+            .get_mut(vault_id)
+            .ok_or(VaultError::NotFound)?
+            .metadata
+            .kdf
+            .memory_kib = memory_kib;
+        Ok(())
+    }
+
+    #[cfg(test)]
+    pub fn tamper_first_ciphertext(&mut self, vault_id: &str) -> Result<(), VaultError> {
+        let byte = self
+            .0
+            .get_mut(vault_id)
+            .and_then(|bundle| bundle.records.first_mut())
+            .and_then(|record| record.envelope.ciphertext.first_mut())
+            .ok_or(VaultError::NotFound)?;
+        *byte ^= 1;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+impl SyncStore for MemorySyncStore {
+    fn get(&self, vault_id: &str) -> Option<SyncBundle> {
+        self.0.get(vault_id).cloned()
+    }
+
+    fn put(&mut self, bundle: SyncBundle) {
+        self.0.insert(bundle.vault_id.clone(), bundle);
+    }
+}
+
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum VaultError {
+    #[error("Vault is locked.")]
+    Locked,
+    #[error("Vault data is unavailable.")]
+    NotFound,
+    #[error("Vault data is invalid.")]
+    InvalidData,
+    #[error("Use a longer master password or passphrase.")]
+    WeakPassword,
+}
+
+pub struct Vault {
+    vault_id: String,
+    metadata: VaultMetadata,
+    records: BTreeMap<String, EncryptedRecord>,
+    key: Option<Zeroizing<[u8; KEY_LEN]>>,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(tag = "kind", content = "data", rename_all = "snake_case")]
+enum VaultItem {
+    EmailAlias(HideMyEmailAlias),
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ItemPayload {
+    schema_version: u16,
+    item: VaultItem,
+}
+
+impl Vault {
+    pub fn create(vault_id: &str, master_password: &str) -> Result<Self, VaultError> {
+        if master_password.len() < 12 {
+            return Err(VaultError::WeakPassword);
+        }
+
+        let salt = random_bytes::<SALT_LEN>();
+        let key = Zeroizing::new(random_bytes::<KEY_LEN>());
+        let kdf = KdfParams::default();
+        let wrapping_key = Zeroizing::new(
+            derive_key(master_password, &salt, &kdf).map_err(|_| VaultError::InvalidData)?,
+        );
+        let wrapped_key = encrypt(
+            &wrapping_key,
+            key.as_slice(),
+            vault_key_aad(vault_id).as_bytes(),
+        )
+        .map_err(|_| VaultError::InvalidData)?;
+
+        Ok(Self {
+            vault_id: vault_id.into(),
+            metadata: VaultMetadata {
+                kdf,
+                salt: salt.to_vec(),
+                wrapped_key,
+            },
+            records: BTreeMap::new(),
+            key: Some(key),
+        })
+    }
+
+    #[cfg(test)]
+    pub(crate) fn download(vault_id: &str, store: &impl SyncStore) -> Result<Self, VaultError> {
+        let bundle = store.get(vault_id).ok_or(VaultError::NotFound)?;
+        if bundle.vault_id != vault_id
+            || bundle.metadata.salt.len() != SALT_LEN
+            || !bundle.metadata.kdf.is_supported()
+        {
+            return Err(VaultError::InvalidData);
+        }
+
+        Ok(Self {
+            vault_id: bundle.vault_id,
+            metadata: bundle.metadata,
+            records: bundle
+                .records
+                .into_iter()
+                .map(|record| (record.id.clone(), record))
+                .collect(),
+            key: None,
+        })
+    }
+
+    pub fn unlock(&mut self, master_password: &str) -> Result<(), VaultError> {
+        let wrapping_key = Zeroizing::new(
+            derive_key(master_password, &self.metadata.salt, &self.metadata.kdf)
+                .map_err(|_| VaultError::InvalidData)?,
+        );
+        let plaintext = Zeroizing::new(
+            decrypt(
+                &wrapping_key,
+                &self.metadata.wrapped_key,
+                vault_key_aad(&self.vault_id).as_bytes(),
+            )
+            .map_err(|_| VaultError::InvalidData)?,
+        );
+        self.key = Some(Zeroizing::new(
+            plaintext
+                .as_slice()
+                .try_into()
+                .map_err(|_| VaultError::InvalidData)?,
+        ));
+        Ok(())
+    }
+
+    pub fn lock(&mut self) {
+        self.key = None;
+    }
+
+    pub fn is_unlocked(&self) -> bool {
+        self.key.is_some()
+    }
+
+    pub fn store_hide_my_email_alias(&mut self, alias: HideMyEmailAlias) -> Result<(), VaultError> {
+        let existing = self
+            .decrypted_items()?
+            .into_iter()
+            .find_map(|(id, item)| match item {
+                VaultItem::EmailAlias(current) if current.provider_id == alias.provider_id => {
+                    Some((id, current))
+                }
+                _ => None,
+            });
+        if existing
+            .as_ref()
+            .is_some_and(|(_, current)| current == &alias)
+        {
+            return Ok(());
+        }
+
+        let key = self.key.as_ref().ok_or(VaultError::Locked)?;
+        let (id, revision) = existing
+            .map(|(id, _)| {
+                self.records[&id]
+                    .revision
+                    .checked_add(1)
+                    .map(|revision| (id, revision))
+                    .ok_or(VaultError::InvalidData)
+            })
+            .transpose()?
+            .unwrap_or_else(|| (Uuid::new_v4().to_string(), 1));
+        let plaintext = Zeroizing::new(
+            serde_json::to_vec(&ItemPayload {
+                schema_version: 1,
+                item: VaultItem::EmailAlias(alias),
+            })
+            .map_err(|_| VaultError::InvalidData)?,
+        );
+        let envelope = encrypt(key, &plaintext, item_aad(&self.vault_id, &id).as_bytes())
+            .map_err(|_| VaultError::InvalidData)?;
+        self.records.insert(
+            id.clone(),
+            EncryptedRecord {
+                id,
+                revision,
+                updated_at: now(),
+                envelope,
+            },
+        );
+        Ok(())
+    }
+
+    pub fn list_hide_my_email_aliases(&self) -> Result<Vec<HideMyEmailAlias>, VaultError> {
+        Ok(self
+            .decrypted_items()?
+            .into_iter()
+            .filter_map(|(_, item)| match item {
+                VaultItem::EmailAlias(alias) => Some(alias),
+            })
+            .collect())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn upload(&self, store: &mut impl SyncStore) -> Result<(), VaultError> {
+        store.put(SyncBundle {
+            vault_id: self.vault_id.clone(),
+            metadata: self.metadata.clone(),
+            records: self.records.values().cloned().collect(),
+        });
+        Ok(())
+    }
+
+    #[cfg(test)]
+    pub fn record_count(&self) -> usize {
+        self.records.len()
+    }
+
+    #[cfg(test)]
+    pub fn set_first_revision(&mut self, revision: u64) -> Result<(), VaultError> {
+        self.records
+            .values_mut()
+            .next()
+            .ok_or(VaultError::NotFound)?
+            .revision = revision;
+        Ok(())
+    }
+
+    fn decrypted_items(&self) -> Result<Vec<(String, VaultItem)>, VaultError> {
+        let key = self.key.as_ref().ok_or(VaultError::Locked)?;
+        self.records
+            .values()
+            .map(|record| {
+                let plaintext = Zeroizing::new(
+                    decrypt(
+                        key,
+                        &record.envelope,
+                        item_aad(&self.vault_id, &record.id).as_bytes(),
+                    )
+                    .map_err(|_| VaultError::InvalidData)?,
+                );
+                let payload: ItemPayload =
+                    serde_json::from_slice(&plaintext).map_err(|_| VaultError::InvalidData)?;
+                if payload.schema_version != 1 {
+                    return Err(VaultError::InvalidData);
+                }
+                Ok((record.id.clone(), payload.item))
+            })
+            .collect()
+    }
+}
+
+fn vault_key_aad(vault_id: &str) -> String {
+    format!("laojie-river:vault-key:v1:{vault_id}")
+}
+
+fn item_aad(vault_id: &str, item_id: &str) -> String {
+    format!("laojie-river:item:v1:{vault_id}:{item_id}")
+}
+
+fn now() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
