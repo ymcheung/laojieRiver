@@ -1,10 +1,12 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
   import { ArrowRight, DatabaseZap, FlaskConical, Shield, UserRoundCheck } from '@lucide/svelte';
   import Badge from '$lib/components/ui/badge/Badge.svelte';
-  import { enableDemoMode } from '$lib/features/demoMode';
+  import { accountSession } from '$lib/features/account/session.svelte';
 
-  function startDemoMode() {
-    enableDemoMode();
+  async function startDemoMode() {
+    await accountSession.enterDemo();
+    await goto('/vault');
   }
 </script>
 
@@ -23,16 +25,10 @@
       <div class="mt-8 flex flex-wrap gap-3">
         <a
           class="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[rgb(var(--primary))] px-4 text-sm font-medium text-[rgb(var(--primary-foreground))] transition-colors duration-200 hover:bg-[rgb(var(--primary-hover))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--ring))]"
-          href="/onboarding"
+          href="/auth"
         >
-          Create vault
+          Continue with email
           <ArrowRight size={16} />
-        </a>
-        <a
-          class="inline-flex h-10 cursor-pointer items-center justify-center rounded-[var(--radius-md)] border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 text-sm font-medium text-[rgb(var(--foreground))] transition-colors duration-200 hover:bg-[rgb(var(--surface-muted))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--ring))]"
-          href="/unlock"
-        >
-          Unlock existing vault
         </a>
       </div>
 
@@ -54,14 +50,14 @@
             </p>
           </div>
         </div>
-        <a
+        <button
           class="inline-flex h-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-[var(--radius-md)] border border-[rgb(var(--border))] bg-[rgb(var(--surface))] px-4 text-sm font-medium text-[rgb(var(--foreground))] transition-colors duration-200 hover:bg-[rgb(var(--surface-muted))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--ring))]"
-          href="/vault"
-          onclick={startDemoMode}
+          type="button"
+          onclick={() => void startDemoMode()}
         >
           Start demo
           <ArrowRight size={16} />
-        </a>
+        </button>
       </div>
     </div>
 

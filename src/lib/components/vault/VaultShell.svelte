@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { onMount } from 'svelte';
   import { KeyRound, Lock, Plus, Search } from '@lucide/svelte';
@@ -6,20 +7,25 @@
   import Button from '$lib/components/ui/button/Button.svelte';
   import Input from '$lib/components/ui/input/Input.svelte';
   import VaultEmptyState from '$lib/components/vault/VaultEmptyState.svelte';
-  import { isDemoModeEnabled } from '$lib/features/demoMode';
+  import { accountSession } from '$lib/features/account/session.svelte';
   import SplitPaneSeparator from '$lib/features/splitPane/SplitPaneSeparator.svelte';
   import { createSplitPane } from '$lib/features/splitPane/createSplitPane.svelte';
   import { demoVaultItems } from '$lib/features/vault/demoItems';
   import { getVaultEmptyState } from '$lib/features/vault/emptyStates';
   import { vaultSections } from '$lib/features/vault/navigation';
+  import { vaultApi } from '$lib/features/vault/api';
+  import type { VaultItemSummary } from '$lib/features/vault/types';
   import { cn } from '$lib/utils/cn';
 
   const sectionId = $derived(page.url.searchParams.get('section') ?? 'all');
   const activeSection = $derived(
     vaultSections.find((section) => section.id === sectionId) ?? vaultSections[0]
   );
+  let realItems = $state.raw<VaultItemSummary[]>([]);
+  let loadError = $state('');
+  const items = $derived(accountSession.demoMode ? demoVaultItems : realItems);
   const filteredItems = $derived(
-    demoVaultItems.filter((item) => {
+    items.filter((item) => {
       if (activeSection.id === 'all') return true;
       if (activeSection.id === 'favorites') return item.favorite;
       if (activeSection.id === 'logins') return item.kind === 'login';
@@ -36,10 +42,18 @@
     minLeftPaneWidth: 320,
     minRightPaneWidth: 512
   });
-  let demoModeEnabled = $state(false);
+  async function lockVault() {
+    if (accountSession.demoMode) return;
+    await accountSession.lockVault();
+    await goto('/unlock');
+  }
 
   onMount(() => {
-    demoModeEnabled = isDemoModeEnabled();
+    if (accountSession.demoMode) return;
+    void vaultApi
+      .listItems()
+      .then((items) => (realItems = items))
+      .catch(() => (loadError = 'Could not load vault items.'));
   });
 </script>
 
@@ -47,7 +61,7 @@
   class="vault-shell relative min-h-screen bg-[rgb(var(--background))] px-4 pb-0 pt-16 sm:px-8 lg:px-0"
 >
   <div class="fixed left-4 right-4 top-4 z-10 flex h-9 items-center justify-end gap-2.5 sm:left-auto sm:right-6">
-    {#if demoModeEnabled}
+    {#if accountSession.demoMode}
       <Badge tone="accent">Demo</Badge>
     {/if}
     <div class="relative min-w-0 flex-1 sm:w-72 sm:flex-none lg:w-80">
@@ -57,11 +71,17 @@
       />
       <Input inputSize="sm" aria-label="Search vault items" class="pl-9" placeholder="Search items" />
     </div>
-    <Button class="h-9 px-3" variant="ghost" size="sm">
+    <Button
+      class="h-9 px-3"
+      variant="ghost"
+      size="sm"
+      disabled={accountSession.demoMode}
+      onclick={() => void lockVault()}
+    >
       <Lock size={16} />
       <span class="hidden sm:inline">Lock</span>
     </Button>
-    {#if demoModeEnabled}
+    {#if accountSession.demoMode}
       <a
         class="inline-flex h-9 items-center rounded-[var(--radius-sm)] px-2.5 text-sm font-medium text-[rgb(var(--foreground))] transition-colors duration-200 hover:bg-[rgb(var(--surface-muted))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--ring))]"
         href="/settings?section=demo"
@@ -119,6 +139,11 @@
         </div>
 
         <div class="grid gap-2 p-3">
+          {#if loadError}
+            <p class="rounded-[var(--radius-md)] bg-[rgb(var(--danger)/0.1)] px-3 py-2 text-sm" role="alert">
+              {loadError}
+            </p>
+          {/if}
           {#each filteredItems as item (item.id)}
             <button
               class="grid cursor-pointer gap-1 rounded-[var(--radius-md)] border border-transparent p-3 text-left transition-colors duration-200 hover:border-[rgb(var(--border))] hover:bg-[rgb(var(--surface-muted))]"

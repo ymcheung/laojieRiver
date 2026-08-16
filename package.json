@@ -9,10 +9,12 @@
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "test:frontend": "node --test src/lib/features/account/routing.test.ts",
     "tauri": "tauri"
   },
   "dependencies": {
     "@lucide/svelte": "^1.17.0",
+    "@neondatabase/auth": "0.5.0-beta",
     "@tanstack/svelte-form": "^1.33.0",
     "@tauri-apps/api": "^2.0.0",
     "@tauri-apps/plugin-shell": "^2.0.0",

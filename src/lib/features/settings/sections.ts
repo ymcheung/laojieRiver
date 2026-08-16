@@ -2,10 +2,16 @@ export type SettingsSection = {
   id: string;
   label: string;
   description: string;
-  icon: 'security' | 'appearance' | 'backup' | 'import-export' | 'clipboard' | 'auto-lock' | 'demo';
+  icon: 'account' | 'security' | 'appearance' | 'backup' | 'import-export' | 'clipboard' | 'auto-lock' | 'demo';
 };
 
 export const settingsSections: SettingsSection[] = [
+  {
+    id: 'account',
+    label: 'Account',
+    description: 'Signed-in identity, language, and sign-out.',
+    icon: 'account'
+  },
   {
     id: 'demo',
     label: 'Demo mode',

@@ -4,6 +4,7 @@
   import { AlertTriangle } from '@lucide/svelte';
   import Button from '$lib/components/ui/button/Button.svelte';
   import Input from '$lib/components/ui/input/Input.svelte';
+  import { accountSession } from '$lib/features/account/session.svelte';
   import { vaultApi } from '$lib/features/vault/api';
 
   let errorMessage = $state('');
@@ -27,6 +28,7 @@
 
       try {
         await vaultApi.createVault(value.masterPassword);
+        await accountSession.refreshVaultState();
         await goto('/vault');
       } catch (error) {
         errorMessage = error instanceof Error ? error.message : 'Could not create vault.';

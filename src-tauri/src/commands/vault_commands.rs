@@ -77,6 +77,17 @@ pub async fn lock_vault(state: State<'_, Mutex<AppState>>) -> Result<(), AppErro
     Ok(())
 }
 
+#[tauri::command]
+pub async fn discard_vault(state: State<'_, Mutex<AppState>>) -> Result<(), AppError> {
+    let mut state = state.lock().map_err(|_| AppError::Internal)?;
+    discard_vault_in_state(&mut state);
+    Ok(())
+}
+
+fn discard_vault_in_state(state: &mut AppState) {
+    state.vault = None;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -90,5 +101,15 @@ mod tests {
             create_vault_in_state(&mut state, "another correct horse battery staple"),
             Err(AppError::VaultExists)
         ));
+    }
+
+    #[test]
+    fn discarding_a_vault_removes_it_from_memory() {
+        let mut state = AppState::default();
+        create_vault_in_state(&mut state, "correct horse battery staple").unwrap();
+
+        discard_vault_in_state(&mut state);
+
+        assert!(state.vault.is_none());
     }
 }

@@ -9,7 +9,7 @@ use commands::{
     hide_my_email_commands::list_hide_my_email_aliases,
     item_commands::{get_item, list_items},
     settings_commands::generate_password,
-    vault_commands::{create_vault, get_vault_state, lock_vault, unlock_vault},
+    vault_commands::{create_vault, discard_vault, get_vault_state, lock_vault, unlock_vault},
 };
 use core::vault::Vault;
 
@@ -28,6 +28,7 @@ pub fn run() {
             create_vault,
             unlock_vault,
             lock_vault,
+            discard_vault,
             list_hide_my_email_aliases,
             list_items,
             get_item,

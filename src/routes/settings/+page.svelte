@@ -1,7 +1,6 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
-  import { onMount } from 'svelte';
   import {
     Archive,
     Brush,
@@ -11,16 +10,20 @@
     KeyRound,
     LockKeyhole,
     Monitor,
-    ShieldCheck
+    ShieldCheck,
+    UserRound
   } from '@lucide/svelte';
   import Button from '$lib/components/ui/button/Button.svelte';
-  import { disableDemoMode, isDemoModeEnabled } from '$lib/features/demoMode';
+  import { messages, type Locale } from '$lib/features/account/i18n';
+  import { accountSession } from '$lib/features/account/session.svelte';
   import SplitPaneSeparator from '$lib/features/splitPane/SplitPaneSeparator.svelte';
   import { createSplitPane } from '$lib/features/splitPane/createSplitPane.svelte';
   import { settingsSections, type SettingsSection } from '$lib/features/settings/sections';
   import { cn } from '$lib/utils/cn';
 
-  const activeId = $derived(page.url.searchParams.get('section') ?? 'security');
+  const activeId = $derived(
+    page.url.searchParams.get('section') ?? (accountSession.demoMode ? 'demo' : 'account')
+  );
   const activeSection = $derived(
     settingsSections.find((section) => section.id === activeId) ?? settingsSections[0]
   );
@@ -28,21 +31,41 @@
     minLeftPaneWidth: 320,
     minRightPaneWidth: 560
   });
-  let demoModeEnabled = $state(false);
+  let signingOut = $state(false);
+  const copy = $derived(messages[accountSession.locale]);
 
   async function turnOffDemoMode() {
-    disableDemoMode();
-    demoModeEnabled = false;
-    await goto('/');
+    accountSession.exitDemo();
+    await goto(
+      accountSession.status === 'authenticated' ? accountSession.realVaultDestination : '/auth'
+    );
   }
 
-  onMount(() => {
-    demoModeEnabled = isDemoModeEnabled();
-  });
+  async function turnOnDemoMode() {
+    await accountSession.enterDemo();
+    await goto('/vault');
+  }
+
+  async function signOut() {
+    signingOut = true;
+    await accountSession.signOut();
+    signingOut = false;
+    await goto('/auth');
+  }
+
+  function sectionLabel(section: SettingsSection) {
+    return section.id === 'account' ? copy.account : section.label;
+  }
+
+  function sectionDescription(section: SettingsSection) {
+    return section.id === 'account' ? copy.accountDescription : section.description;
+  }
 </script>
 
 {#snippet settingsIcon(icon: SettingsSection['icon'])}
-  {#if icon === 'security'}
+  {#if icon === 'account'}
+    <UserRound size={18} />
+  {:else if icon === 'security'}
     <ShieldCheck size={18} />
   {:else if icon === 'appearance'}
     <Brush size={18} />
@@ -106,9 +129,9 @@
               {@render settingsIcon(section.icon)}
             </span>
             <span class="min-w-0">
-              <span class="block">{section.label}</span>
+              <span class="block">{sectionLabel(section)}</span>
               <span class="mt-1 block text-xs font-normal leading-5 text-[rgb(var(--muted))]">
-                {section.description}
+                {sectionDescription(section)}
               </span>
             </span>
           </a>
@@ -131,10 +154,10 @@
           <div>
             <p class="text-xs font-medium uppercase tracking-normal text-[rgb(var(--muted))]">Settings</p>
             <h1 class="mt-2 text-2xl font-semibold tracking-normal text-[rgb(var(--foreground))]">
-              {activeSection.label}
+              {sectionLabel(activeSection)}
             </h1>
             <p class="mt-2 max-w-xl text-sm leading-6 text-[rgb(var(--muted))]">
-              {activeSection.description} Command wiring comes after the vault core and platform integrations.
+              {sectionDescription(activeSection)}{#if activeSection.id !== 'account'} Command wiring comes after the vault core and platform integrations.{/if}
             </p>
           </div>
           <div
@@ -146,7 +169,45 @@
         </div>
 
         <div class="mt-8 grid gap-4">
-          {#if activeSection.id === 'demo'}
+          {#if activeSection.id === 'account'}
+            <section
+              class="rounded-[var(--radius-md)] border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
+            >
+              <div class="grid gap-5">
+                {#if !accountSession.demoMode && accountSession.user}
+                  <div>
+                    <p class="text-sm text-[rgb(var(--muted))]">{copy.signedInAs}</p>
+                    <p class="mt-1 text-sm font-medium">{accountSession.user.email}</p>
+                  </div>
+                {/if}
+
+                <label class="grid gap-2 text-sm font-medium" for="account-locale">
+                  {copy.language}
+                  <select
+                    id="account-locale"
+                    class="h-10 rounded-[var(--radius-md)] border border-[rgb(var(--input))] bg-[rgb(var(--surface))] px-3 text-sm"
+                    value={accountSession.locale}
+                    onchange={(event) => accountSession.setLocale(event.currentTarget.value as Locale)}
+                  >
+                    <option value="en">{copy.english}</option>
+                    <option value="tw">{copy.chinese}</option>
+                  </select>
+                </label>
+
+                {#if !accountSession.demoMode && accountSession.user}
+                  <div>
+                    <Button
+                      variant="secondary"
+                      disabled={signingOut}
+                      onclick={() => void signOut()}
+                    >
+                      {signingOut ? copy.signingOut : copy.signOut}
+                    </Button>
+                  </div>
+                {/if}
+              </div>
+            </section>
+          {:else if activeSection.id === 'demo'}
             <section
               class="rounded-[var(--radius-md)] border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-4"
             >
@@ -162,20 +223,20 @@
                   <span
                     class={cn(
                       'inline-flex h-8 items-center rounded-[var(--radius-sm)] border px-3 text-sm font-medium',
-                      demoModeEnabled
+                      accountSession.demoMode
                         ? 'border-[rgb(var(--primary)/0.28)] bg-[rgb(var(--primary)/0.12)] text-[rgb(var(--accent-foreground))]'
                         : 'border-[rgb(var(--border))] bg-[rgb(var(--surface-muted))] text-[rgb(var(--muted))]'
                     )}
                   >
-                    {demoModeEnabled ? 'On' : 'Off'}
+                    {accountSession.demoMode ? 'On' : 'Off'}
                   </span>
                   <Button
-                    disabled={!demoModeEnabled}
                     variant="secondary"
                     size="sm"
-                    onclick={() => void turnOffDemoMode()}
+                    onclick={() =>
+                      void (accountSession.demoMode ? turnOffDemoMode() : turnOnDemoMode())}
                   >
-                    Turn off
+                    {accountSession.demoMode ? 'Turn off' : 'Turn on'}
                   </Button>
                 </div>
               </div>
