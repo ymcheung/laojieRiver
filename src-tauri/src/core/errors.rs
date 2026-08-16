@@ -1,6 +1,8 @@
 use serde::ser::{Serialize, Serializer};
 use thiserror::Error;
 
+use crate::core::hide_my_email::HideMyEmailError;
+use crate::core::storage::StorageError;
 use crate::core::vault::VaultError;
 
 #[derive(Debug, Error)]
@@ -15,8 +17,25 @@ pub enum AppError {
     Validation(String),
     #[error("This feature is not implemented yet.")]
     NotImplemented,
+    #[error("Live Apple connection is unavailable in this build.")]
+    ProviderUnavailable,
     #[error("Internal error.")]
     Internal,
+}
+
+impl From<StorageError> for AppError {
+    fn from(_: StorageError) -> Self {
+        Self::Internal
+    }
+}
+
+impl From<HideMyEmailError> for AppError {
+    fn from(error: HideMyEmailError) -> Self {
+        match error {
+            HideMyEmailError::ServiceUnavailable => Self::ProviderUnavailable,
+            _ => Self::Validation(error.to_string()),
+        }
+    }
 }
 
 impl From<VaultError> for AppError {

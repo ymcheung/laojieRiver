@@ -34,8 +34,8 @@ struct EncryptedRecord {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[cfg(test)]
 pub(crate) struct SyncBundle {
+    schema_version: u16,
     vault_id: String,
     metadata: VaultMetadata,
     records: Vec<EncryptedRecord>,
@@ -109,6 +109,7 @@ pub enum VaultError {
     WeakPassword,
 }
 
+#[derive(Clone)]
 pub struct Vault {
     vault_id: String,
     metadata: VaultMetadata,
@@ -163,21 +164,48 @@ impl Vault {
     #[cfg(test)]
     pub(crate) fn download(vault_id: &str, store: &impl SyncStore) -> Result<Self, VaultError> {
         let bundle = store.get(vault_id).ok_or(VaultError::NotFound)?;
+        Self::from_bundle(vault_id, bundle)
+    }
+
+    pub fn vault_id(&self) -> &str {
+        &self.vault_id
+    }
+
+    pub fn to_persisted_bytes(&self) -> Result<Vec<u8>, VaultError> {
+        serde_json::to_vec(&self.bundle()).map_err(|_| VaultError::InvalidData)
+    }
+
+    pub fn from_persisted_bytes(vault_id: &str, bytes: &[u8]) -> Result<Self, VaultError> {
+        let bundle = serde_json::from_slice(bytes).map_err(|_| VaultError::InvalidData)?;
+        Self::from_bundle(vault_id, bundle)
+    }
+
+    fn from_bundle(vault_id: &str, bundle: SyncBundle) -> Result<Self, VaultError> {
         if bundle.vault_id != vault_id
+            || bundle.schema_version != 1
             || bundle.metadata.salt.len() != SALT_LEN
             || !bundle.metadata.kdf.is_supported()
+            || bundle.records.iter().any(|record| {
+                record.id.is_empty() || record.revision == 0 || record.envelope.nonce.is_empty()
+            })
         {
+            return Err(VaultError::InvalidData);
+        }
+
+        let record_count = bundle.records.len();
+        let records: BTreeMap<_, _> = bundle
+            .records
+            .into_iter()
+            .map(|record| (record.id.clone(), record))
+            .collect();
+        if records.len() != record_count {
             return Err(VaultError::InvalidData);
         }
 
         Ok(Self {
             vault_id: bundle.vault_id,
             metadata: bundle.metadata,
-            records: bundle
-                .records
-                .into_iter()
-                .map(|record| (record.id.clone(), record))
-                .collect(),
+            records,
             key: None,
         })
     }
@@ -263,22 +291,72 @@ impl Vault {
 
     pub fn list_hide_my_email_aliases(&self) -> Result<Vec<HideMyEmailAlias>, VaultError> {
         Ok(self
+            .list_hide_my_email_alias_records()?
+            .into_iter()
+            .map(|(_, alias)| alias)
+            .collect())
+    }
+
+    pub fn list_hide_my_email_alias_records(
+        &self,
+    ) -> Result<Vec<(String, HideMyEmailAlias)>, VaultError> {
+        Ok(self
             .decrypted_items()?
             .into_iter()
-            .filter_map(|(_, item)| match item {
-                VaultItem::EmailAlias(alias) => Some(alias),
+            .filter_map(|(id, item)| match item {
+                VaultItem::EmailAlias(alias) => Some((id, alias)),
             })
             .collect())
     }
 
+    pub fn apply_hide_my_email_aliases(
+        &mut self,
+        aliases: Vec<HideMyEmailAlias>,
+    ) -> Result<(), VaultError> {
+        let mut provider_ids = BTreeMap::new();
+        if aliases.iter().any(|alias| {
+            alias.provider_id.trim().is_empty()
+                || alias.address.trim().is_empty()
+                || provider_ids.insert(&alias.provider_id, ()).is_some()
+        }) {
+            return Err(VaultError::InvalidData);
+        }
+
+        let original = self.records.clone();
+        for alias in aliases {
+            if let Err(error) = self.store_hide_my_email_alias(alias) {
+                self.records = original;
+                return Err(error);
+            }
+        }
+        Ok(())
+    }
+
+    pub fn remove_all_hide_my_email_aliases(&mut self) -> Result<usize, VaultError> {
+        let ids: Vec<_> = self
+            .decrypted_items()?
+            .into_iter()
+            .filter_map(|(id, item)| matches!(item, VaultItem::EmailAlias(_)).then_some(id))
+            .collect();
+        for id in &ids {
+            self.records.remove(id);
+        }
+        Ok(ids.len())
+    }
+
     #[cfg(test)]
     pub(crate) fn upload(&self, store: &mut impl SyncStore) -> Result<(), VaultError> {
-        store.put(SyncBundle {
+        store.put(self.bundle());
+        Ok(())
+    }
+
+    fn bundle(&self) -> SyncBundle {
+        SyncBundle {
+            schema_version: 1,
             vault_id: self.vault_id.clone(),
             metadata: self.metadata.clone(),
             records: self.records.values().cloned().collect(),
-        });
-        Ok(())
+        }
     }
 
     #[cfg(test)]
@@ -333,4 +411,42 @@ fn now() -> u64 {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs()
+}
+
+#[cfg(test)]
+mod persistence_tests {
+    use super::*;
+
+    fn alias(provider_id: &str, label: &str) -> HideMyEmailAlias {
+        HideMyEmailAlias {
+            provider_id: provider_id.into(),
+            address: format!("{provider_id}@privaterelay.appleid.com"),
+            forwarding_address: None,
+            label: Some(label.into()),
+            note: None,
+            origin: None,
+            is_active: true,
+        }
+    }
+
+    #[test]
+    fn alias_batch_rolls_back_and_records_use_random_ids() {
+        let original = alias("existing", "Original");
+        let mut vault = Vault::create("vault-1", "correct horse battery staple").unwrap();
+        vault.store_hide_my_email_alias(original.clone()).unwrap();
+        let (item_id, _) = vault.list_hide_my_email_alias_records().unwrap().remove(0);
+        assert_ne!(item_id, original.provider_id);
+
+        vault.set_first_revision(u64::MAX).unwrap();
+        assert_eq!(
+            vault.apply_hide_my_email_aliases(vec![
+                alias("new", "New"),
+                alias("existing", "Updated"),
+            ]),
+            Err(VaultError::InvalidData)
+        );
+        assert_eq!(vault.list_hide_my_email_aliases().unwrap(), vec![original]);
+        assert_eq!(vault.remove_all_hide_my_email_aliases().unwrap(), 1);
+        assert!(vault.list_hide_my_email_aliases().unwrap().is_empty());
+    }
 }

@@ -6,11 +6,14 @@
   import Badge from '$lib/components/ui/badge/Badge.svelte';
   import Button from '$lib/components/ui/button/Button.svelte';
   import Input from '$lib/components/ui/input/Input.svelte';
+  import HideMyEmailPanel from '$lib/components/vault/HideMyEmailPanel.svelte';
   import VaultEmptyState from '$lib/components/vault/VaultEmptyState.svelte';
   import { accountSession } from '$lib/features/account/session.svelte';
   import SplitPaneSeparator from '$lib/features/splitPane/SplitPaneSeparator.svelte';
   import { createSplitPane } from '$lib/features/splitPane/createSplitPane.svelte';
   import { demoVaultItems } from '$lib/features/vault/demoItems';
+  import { demoHideMyEmailAliases } from '$lib/features/hideMyEmail/demoAliases';
+  import { hideMyEmailMessages } from '$lib/features/hideMyEmail/i18n';
   import { getVaultEmptyState } from '$lib/features/vault/emptyStates';
   import { vaultSections } from '$lib/features/vault/navigation';
   import { vaultApi } from '$lib/features/vault/api';
@@ -23,9 +26,28 @@
   );
   let realItems = $state.raw<VaultItemSummary[]>([]);
   let loadError = $state('');
-  const items = $derived(accountSession.demoMode ? demoVaultItems : realItems);
+  let query = $state('');
+  const hideMyEmailCopy = $derived(hideMyEmailMessages[accountSession.locale]);
+  const aliasItems = $derived(
+    demoHideMyEmailAliases.map((alias) => ({
+      id: alias.id,
+      kind: 'email_alias' as const,
+      title: alias.label || alias.address,
+      username: alias.address,
+      url: undefined,
+      favorite: false,
+      updatedAt: alias.updatedAt || ''
+    }))
+  );
+  const items = $derived(
+    accountSession.demoMode ? [...demoVaultItems, ...aliasItems] : realItems
+  );
   const filteredItems = $derived(
     items.filter((item) => {
+      const matchesQuery = [item.title, item.username, item.url].some((value) =>
+        value?.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())
+      );
+      if (!matchesQuery) return false;
       if (activeSection.id === 'all') return true;
       if (activeSection.id === 'favorites') return item.favorite;
       if (activeSection.id === 'logins') return item.kind === 'login';
@@ -48,12 +70,17 @@
     await goto('/unlock');
   }
 
-  onMount(() => {
+  async function loadItems() {
     if (accountSession.demoMode) return;
-    void vaultApi
-      .listItems()
-      .then((items) => (realItems = items))
-      .catch(() => (loadError = 'Could not load vault items.'));
+    try {
+      realItems = await vaultApi.listItems();
+    } catch {
+      loadError = 'Could not load vault items.';
+    }
+  }
+
+  onMount(() => {
+    void loadItems();
   });
 </script>
 
@@ -69,7 +96,13 @@
         class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[rgb(var(--muted))]"
         size={16}
       />
-      <Input inputSize="sm" aria-label="Search vault items" class="pl-9" placeholder="Search items" />
+      <Input
+        inputSize="sm"
+        aria-label={activeSection.id === 'hide-my-email' ? hideMyEmailCopy.search : 'Search vault items'}
+        class="pl-9"
+        placeholder={activeSection.id === 'hide-my-email' ? hideMyEmailCopy.search : 'Search items'}
+        bind:value={query}
+      />
     </div>
     <Button
       class="h-9 px-3"
@@ -112,7 +145,7 @@
         )}
         href={section.href}
       >
-        {section.label}
+        {section.id === 'hide-my-email' ? hideMyEmailCopy.section : section.label}
       </a>
     {/each}
   </nav>
@@ -122,6 +155,9 @@
     class="mx-auto grid min-h-[calc(100vh-4rem)] max-w-[78rem] grid-cols-1 overflow-hidden rounded-tl-[2rem] lg:ml-[var(--vault-workspace-left)] lg:mr-0 lg:max-w-none lg:grid-cols-[var(--split-pane-columns)]"
     style:--split-pane-columns={splitPane.gridColumns}
   >
+    {#if activeSection.id === 'hide-my-email'}
+      <HideMyEmailPanel {query} {splitPane} onAliasesChanged={() => void loadItems()} />
+    {:else}
     <aside class="min-h-[28rem] overflow-auto bg-[rgb(var(--surface))]">
       <header class="border-b border-[rgb(var(--border))] px-5 py-5">
         <div class="flex flex-wrap items-center justify-end gap-3">
@@ -222,6 +258,7 @@
         {/if}
       </div>
     </main>
+    {/if}
   </div>
 </section>
 

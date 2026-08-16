@@ -9,7 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-    "test:frontend": "node --test src/lib/features/account/routing.test.ts",
+    "test:frontend": "node --test src/lib/features/account/routing.test.ts src/lib/features/hideMyEmail/filterAliases.test.ts",
     "tauri": "tauri"
   },
   "dependencies": {

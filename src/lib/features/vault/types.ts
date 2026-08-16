@@ -3,7 +3,7 @@ export type VaultState = {
   unlocked: boolean;
 };
 
-export type VaultItemKind = 'login' | 'secure_note' | 'card' | 'identity';
+export type VaultItemKind = 'login' | 'secure_note' | 'card' | 'identity' | 'email_alias';
 
 export type VaultItemSummary = {
   id: string;
@@ -40,4 +40,3 @@ export type PasswordGeneratorOptions = {
   symbols: boolean;
   avoidAmbiguous: boolean;
 };
-

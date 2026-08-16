@@ -8,6 +8,7 @@ use zeroize::Zeroizing;
 
 use crate::{
     core::{errors::AppError, vault::Vault},
+    platform::keychain::{KeychainSessionStore, ProtectedSessionStore},
     AppState,
 };
 
@@ -42,7 +43,11 @@ fn create_vault_in_state(state: &mut AppState, master_password: &str) -> Result<
     if state.vault.is_some() {
         return Err(AppError::VaultExists);
     }
-    state.vault = Some(Vault::create(&Uuid::new_v4().to_string(), master_password)?);
+    let vault = Vault::create(&Uuid::new_v4().to_string(), master_password)?;
+    if let Some(storage) = &state.storage {
+        storage.save(&vault)?;
+    }
+    state.vault = Some(vault);
     Ok(())
 }
 
@@ -74,18 +79,37 @@ pub async fn lock_vault(state: State<'_, Mutex<AppState>>) -> Result<(), AppErro
         .as_mut()
         .ok_or(AppError::VaultUnavailable)?
         .lock();
+    if let Some(provider) = state.hide_my_email.as_mut() {
+        provider.disconnect();
+    }
     Ok(())
 }
 
 #[tauri::command]
 pub async fn discard_vault(state: State<'_, Mutex<AppState>>) -> Result<(), AppError> {
     let mut state = state.lock().map_err(|_| AppError::Internal)?;
-    discard_vault_in_state(&mut state);
+    let vault_id = state
+        .vault
+        .as_ref()
+        .ok_or(AppError::VaultUnavailable)?
+        .vault_id()
+        .to_owned();
+    KeychainSessionStore
+        .delete(&vault_id)
+        .map_err(|_| AppError::Internal)?;
+    if let Some(provider) = state.hide_my_email.as_mut() {
+        provider.disconnect();
+    }
+    discard_vault_in_state(&mut state)?;
     Ok(())
 }
 
-fn discard_vault_in_state(state: &mut AppState) {
+fn discard_vault_in_state(state: &mut AppState) -> Result<(), AppError> {
+    if let (Some(storage), Some(vault)) = (&state.storage, &state.vault) {
+        storage.delete(vault.vault_id())?;
+    }
     state.vault = None;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -108,7 +132,7 @@ mod tests {
         let mut state = AppState::default();
         create_vault_in_state(&mut state, "correct horse battery staple").unwrap();
 
-        discard_vault_in_state(&mut state);
+        discard_vault_in_state(&mut state).unwrap();
 
         assert!(state.vault.is_none());
     }

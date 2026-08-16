@@ -13,6 +13,12 @@ export const vaultSections: VaultSection[] = [
     description: 'All unlocked item summaries'
   },
   {
+    id: 'hide-my-email',
+    label: 'Hide My Email',
+    href: '/vault?section=hide-my-email',
+    description: 'Private iCloud email aliases'
+  },
+  {
     id: 'favorites',
     label: 'Favorites',
     href: '/vault?section=favorites',
